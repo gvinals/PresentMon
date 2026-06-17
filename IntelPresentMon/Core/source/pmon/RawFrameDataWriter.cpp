@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "RawFrameDataWriter.h"
 #include <CommonUtilities/Exception.h>
+#include <CommonUtilities/mc/GamingQoS.h>
+#include <CommonUtilities/mc/MetricsTypes.h>
 #include <PresentMonAPIWrapper/FrameQuery.h>
 #include <PresentMonAPIWrapperCommon/EnumMap.h>
 #include <format>
@@ -400,6 +402,9 @@ namespace p2c::pmon
                     else if (column.definition.metricId == PM_METRIC_ANIMATION_ERROR) {
                         animationErrorElementIdx_ = int(queryElements_.size() - 1);
                     }
+                    else if (column.definition.metricId == PM_METRIC_PC_LATENCY) {
+                        pcLatencyElementIdx_ = int(queryElements_.size() - 1);
+                    }
                 }
             }
             // if any specially-required fields are missing, add to query (but not to annotations)
@@ -430,6 +435,15 @@ namespace p2c::pmon
                     });
                 animationErrorElementIdx_ = int(queryElements_.size() - 1);
             }
+            if (pcLatencyElementIdx_ < 0) {
+                queryElements_.push_back(PM_QUERY_ELEMENT{
+                    .metric = PM_METRIC_PC_LATENCY,
+                    .stat = PM_STAT_NONE,
+                    .deviceId = 0,
+                    .arrayIndex = 0,
+                });
+                pcLatencyElementIdx_ = int(queryElements_.size() - 1);
+            }
 
             // register query
             query_ = session.RegisterFrameQuery(queryElements_);
@@ -453,6 +467,10 @@ namespace p2c::pmon
         double ExtractAnimationErrorFromBlob(const uint8_t* pBlob) const
         {
             return reinterpret_cast<const double&>(pBlob[queryElements_[animationErrorElementIdx_].dataOffset]);
+        }
+        double ExtractPcLatencyFromBlob(const uint8_t* pBlob) const
+        {
+            return reinterpret_cast<const double&>(pBlob[queryElements_[pcLatencyElementIdx_].dataOffset]);
         }
         void WriteFrame(std::ostream& out, const uint8_t* pBlob)
         {
@@ -492,6 +510,7 @@ namespace p2c::pmon
         int totalTimeElementIdx_ = -1;
         int msBetweenPresentsElementIdx_ = -1;
         int animationErrorElementIdx_ = -1;
+        int pcLatencyElementIdx_ = -1;
     };
 
     RawFrameDataWriter::RawFrameDataWriter(std::wstring path, const pmapi::ProcessTracker& procTrackerIn, uint32_t activeDeviceId,
@@ -502,6 +521,7 @@ namespace p2c::pmon
         frameStatsPath{ std::move(frameStatsPathIn) },
         pStatsTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
         pAnimationErrorTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
+        pPcLatencyTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
         file{ path }
     {
         const auto& opt = cli::Options::Get();
@@ -548,6 +568,13 @@ namespace p2c::pmon
                         pAnimationErrorTracker->Push(std::abs(animationError));
                     }
                 }
+                if (pPcLatencyTracker) {
+                    const auto pcLatency = pQueryElementContainer->ExtractPcLatencyFromBlob(pBlob);
+                    if (!std::isnan(pcLatency) &&
+                        !::pmon::util::metrics::IsMissingFrameMetricValue(pcLatency)) {
+                        pPcLatencyTracker->Push(pcLatency);
+                    }
+                }
                 pQueryElementContainer->WriteFrame(file, pBlob);
             }
         } while (blobs.AllBlobsPopulated()); // if container filled, means more might be left
@@ -563,6 +590,7 @@ namespace p2c::pmon
     {
         auto& stats = *pStatsTracker;
         auto& aeStats = *pAnimationErrorTracker;
+        auto& pcStats = *pPcLatencyTracker;
 
         std::ofstream statsFile{ *frameStatsPath, std::ios::trunc };
 
@@ -576,7 +604,13 @@ namespace p2c::pmon
             "5th Percentile FPS,"
             "Maximum FPS,"
             "AnimationErrorPerSecond,"
-            "AnimationErrorPerFrame\n";
+            "AnimationErrorPerFrame,"
+            "GamingQoS,"
+            "GamingQoSGrade,"
+            "GamingQoSLow1Subscore,"
+            "GamingQoSLow5Subscore,"
+            "GamingQoSLatencySubscore,"
+            "GamingQoSAnimationErrorSubscore\n";
 
         // lambda to make sure we don't divide by zero
         // caps max fps output to 1,000,000 fps
@@ -584,24 +618,60 @@ namespace p2c::pmon
             return ft == 0. ? 1'000'000. : 1. / ft;
 		};
 
+        const auto WriteQoSColumns_ = [&](double avgFps, double low1Fps, double low5Fps) {
+            ::pmon::util::metrics::GamingQoSInputs inputs{};
+            if (avgFps > 0.) {
+                inputs.avgFps = avgFps;
+            }
+            if (low1Fps > 0.) {
+                inputs.low1Fps = low1Fps;
+            }
+            if (low5Fps > 0.) {
+                inputs.low5Fps = low5Fps;
+            }
+            if (pcStats.GetCount() > 0) {
+                inputs.pcLatencyMs = pcStats.GetMean() * 1000.;
+            }
+            if (aeStats.GetCount() > 0) {
+                inputs.aeP95Ms = aeStats.GetPercentile(0.95) * 1000.;
+            }
+
+            const auto qos = ::pmon::util::metrics::ComputeGamingQoS(inputs);
+            if (qos.scoreValid) {
+                statsFile << qos.score << "," <<
+                    ::pmon::util::metrics::GamingQoSGradeFromScore(qos.score) << ",";
+                statsFile << (qos.low1Subscore ? *qos.low1Subscore : 0.) << ",";
+                statsFile << (qos.low5Subscore ? *qos.low5Subscore : 0.) << ",";
+                statsFile << (qos.latencySubscore ? *qos.latencySubscore : 0.) << ",";
+                statsFile << (qos.animationErrorSubscore ? *qos.animationErrorSubscore : 0.) << "\n";
+            }
+            else {
+                statsFile << "0,NA,0,0,0,0\n";
+            }
+        };
+
         if (stats.GetCount() > 0) {
             // write data
+            const double avgFps = SafeInvert(stats.GetMean());
+            const double low1Fps = SafeInvert(stats.GetPercentile(.99));
+            const double low5Fps = SafeInvert(stats.GetPercentile(.95));
             statsFile <<
                 GetDuration_() << "," <<
                 stats.GetCount() << "," <<
-                SafeInvert(stats.GetMean()) << "," <<
+                avgFps << "," <<
                 SafeInvert(stats.GetMax()) << "," <<
-                SafeInvert(stats.GetPercentile(.99)) << "," <<
-                SafeInvert(stats.GetPercentile(.95)) << "," <<
+                low1Fps << "," <<
+                low5Fps << "," <<
                 SafeInvert(stats.GetMin()) << ",";
             if (aeStats.GetCount() > 0 && GetDuration_() != 0.) {
                 const double aeSumSecs = aeStats.GetSum() / 1000.;
                 statsFile << (aeSumSecs / GetDuration_()) << "," <<
-                    (aeStats.GetSum() / aeStats.GetCount()) << "\n";
+                    (aeStats.GetSum() / aeStats.GetCount()) << ",";
             }
             else {
-                statsFile << 0. << 0. << "\n";
+                statsFile << "0,0,";
             }
+            WriteQoSColumns_(avgFps, low1Fps, low5Fps);
 
         }
         else {
@@ -614,7 +684,9 @@ namespace p2c::pmon
 				0. << "," <<
 				0. << "," <<
                 0. << "," <<
-				0. << "\n";
+				0. << "," <<
+				0. << "," <<
+                "0,NA,0,0,0,0\n";
         }
     }
 

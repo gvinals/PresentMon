@@ -15,6 +15,7 @@ namespace p2c::kern
     {
         Graph,
         Readout,
+        Qos,
     };
 
     struct QualifiedMetric
@@ -58,6 +59,13 @@ namespace p2c::kern
         std::string tag;
     };
 
+    struct QosReadoutSpec
+    {
+        QualifiedMetric metric;
+        std::wstring label;
+        std::string tag;
+    };
+
     struct OverlaySpec
     {
         // types
@@ -80,7 +88,7 @@ namespace p2c::kern
         double etwFlushPeriod;
         bool manualEtwFlush;
         OverlayPosition overlayPosition;
-        std::vector<std::variant<GraphSpec, ReadoutSpec>> widgets;
+        std::vector<std::variant<GraphSpec, ReadoutSpec, QosReadoutSpec>> widgets;
         int overlayWidth;
         bool upscale;
         float upscaleFactor;

@@ -4,7 +4,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import ColorPicker from '@/components/ColorPicker.vue';
-import { asReadout, type Widget } from '@/core/widget';
+import { asReadout, asQos, WidgetType, type Widget } from '@/core/widget';
 import { useLoadoutStore } from '@/stores/loadout';
 
 defineOptions({ name: 'WidgetConfig' });
@@ -17,7 +17,12 @@ const props = defineProps<Props>();
 const loadoutStore = useLoadoutStore();
 
 const widget = computed(() => loadoutStore.widgets[props.index]);
-const readout = computed(() => asReadout(widget.value));
+const readout = computed(() => {
+  if (widget.value.widgetType === WidgetType.Qos) {
+    return asQos(widget.value);
+  }
+  return asReadout(widget.value);
+});
 </script>
 
 <template>

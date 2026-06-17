@@ -134,7 +134,7 @@ const metricOptionsFiltered = computed(() => {
 });
 
 const widgetTypeOptions = computed(() => {
-  const opts = [WidgetType.Readout];
+  const opts = [WidgetType.Readout, WidgetType.Qos];
   if (findMetricById(widgetMetric.value.metric.metricId).numeric) {
     opts.push(WidgetType.Graph);
   }
@@ -151,12 +151,20 @@ const isMaster = computed(() => props.lineIdx === 0);
 const isGraphWidget = computed(() => widgetType.value === WidgetType.Graph);
 const isLineGraphWidget = computed(() => isGraphWidget.value && asGraph(widget.value).graphType.name === 'Line');
 const isReadoutWidget = computed(() => widgetType.value === WidgetType.Readout);
+const isQosWidget = computed(() => widgetType.value === WidgetType.Qos);
 </script>
 
 <template>
   <div class="widget-line">
     <div class="widget-cell col-metric">
+      <v-text-field
+        v-if="isQosWidget"
+        model-value="Gaming QoS"
+        readonly
+        :density="isMaster ? 'default' : 'compact'"
+      ></v-text-field>
       <v-autocomplete
+        v-else
         v-model="metricOption"
         item-title="name"
         :items="metricOptionsFiltered"
@@ -174,7 +182,14 @@ const isReadoutWidget = computed(() => widgetType.value === WidgetType.Readout);
     </v-autocomplete>
     </div>
     <div class="widget-cell col-stat"> 
+      <v-text-field
+        v-if="isQosWidget"
+        model-value="Score"
+        readonly
+        :density="isMaster ? 'default' : 'compact'"
+      ></v-text-field>
       <v-select
+        v-else
         v-model="stat"
         item-title="shortName"
         :items="statOptions"
@@ -240,7 +255,7 @@ const isReadoutWidget = computed(() => widgetType.value === WidgetType.Readout);
         color="white">
         <v-icon size="x-large">mdi-cog</v-icon>
       </v-btn>
-      <v-btn icon v-if="!locked && isReadoutWidget"
+      <v-btn icon v-if="!locked && (isReadoutWidget || isQosWidget)"
         :to="{name: 'readout-config', params: {index: widgetIdx}}"
         class="widget-btn details-btn"
         variant="text"

@@ -52,6 +52,11 @@ namespace RealtimeMetricTests
 	static constexpr const char* outFolder_ = "TestOutput\\RealtimeMetric";
 }
 
+namespace GamingQoSQueryTests
+{
+	static constexpr const char* logFolder_ = "TestLogs\\GamingQoSQuery";
+}
+
 namespace LoggingTests
 {
 	static constexpr const char* logFolder_ = "TestLogs\\LoggingTests";

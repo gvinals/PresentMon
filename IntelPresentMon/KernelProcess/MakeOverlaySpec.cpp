@@ -431,6 +431,49 @@ namespace kproc
                     sheets.back()->InsertRaw<at::textSize>(fontSize);
                     sheets.back()->InsertRaw<at::paddingLeft>(fontSize / 5.);
                 }
+                else if (auto pQos = std::get_if<kact::push_spec_impl::Qos>(&widget)) {
+                    using namespace gfx::lay::sty;
+                    auto& qos = *pQos;
+                    auto& sheets = pSpec->sheets;
+                    const auto tag = std::format("q{}", i);
+
+                    pSpec->widgets.push_back(kern::QosReadoutSpec{
+                        .metric = {
+                            .metricId = PM_METRIC_GAMING_QOS_SCORE,
+                            .statId = PM_STAT_AVG,
+                            .arrayIndex = 0,
+                            .deviceId = 0,
+                            .unitId = PM_UNIT_PERCENT,
+                        },
+                        .label = L"Gaming QoS",
+                        .tag = tag,
+                    });
+
+                    const auto fontSize = double(qos.fontSize);
+                    auto backgroundColor = at::make::Color(qos.backgroundColor);
+                    auto fontColor = at::make::Color(qos.fontColor);
+
+                    sheets.push_back(Stylesheet::Make({ {}, { "$qos-readout", tag } }));
+                    sheets.back()->InsertRaw<at::backgroundColor>(backgroundColor);
+
+                    if (!qos.showLabel) {
+                        sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$label" } }));
+                        sheets.back()->InsertRaw<at::display>(at::make::Enum(Display::None));
+                    }
+
+                    sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$text-large" } }));
+                    sheets.back()->InsertRaw<at::textColor>(fontColor);
+                    sheets.back()->InsertRaw<at::textSize>(fontSize);
+
+                    sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$grade-value" } }));
+                    sheets.back()->InsertRaw<at::textColor>(fontColor);
+                    sheets.back()->InsertRaw<at::textSize>(fontSize * 1.4);
+
+                    sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$score-value" } }));
+                    sheets.back()->InsertRaw<at::textColor>(fontColor);
+                    sheets.back()->InsertRaw<at::textSize>(fontSize);
+                    sheets.back()->InsertRaw<at::paddingLeft>(fontSize / 4.);
+                }
                 else {
                     pmlog_warn(std::format("Unknown widget type; variant index [{}]", widget.index()));
                 }

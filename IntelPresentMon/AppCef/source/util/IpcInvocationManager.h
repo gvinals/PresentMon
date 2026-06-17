@@ -105,6 +105,11 @@ namespace p2c::client::util
 				out.emplace<Xfer>();
 				::p2c::client::util::FromV8(v8, std::get<Xfer>(out));
 			}
+			else if (type == kern::WidgetType::Qos) {
+				using Xfer = kproc::kact::push_spec_impl::Qos;
+				out.emplace<Xfer>();
+				::p2c::client::util::FromV8(v8, std::get<Xfer>(out));
+			}
 			else {
 				pmlog_error("Unknown widget type").pmwatch(int(type));
 			}

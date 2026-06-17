@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: MIT
 import { type Graph } from './graph'
 import { type Readout } from './readout'
+import { type Qos } from './qos'
 import { type WidgetMetric, regenerateKeys as regenerateMetricKeys } from './widget-metric';
 
 export enum WidgetType {
     Graph,
     Readout,
+    Qos,
 }
 
 export interface Widget {
@@ -44,4 +46,11 @@ export function asReadout(w: Widget): Readout {
         throw new Error(`Widget type [${WidgetType[w.widgetType]}] accessed as Readout`);
     }
     return w as Readout;
+}
+
+export function asQos(w: Widget): Qos {
+    if (w.widgetType !== WidgetType.Qos) {
+        throw new Error(`Widget type [${WidgetType[w.widgetType]}] accessed as Qos`);
+    }
+    return w as Qos;
 }

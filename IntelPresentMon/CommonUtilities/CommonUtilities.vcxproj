@@ -72,6 +72,7 @@
     <ClInclude Include="Macro.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="SampleStatistics.h" />
+    <ClInclude Include="mc\GamingQoS.h" />
     <ClInclude Include="mc\FrameMetricsMemberMap.h" />
     <ClInclude Include="mc\MetricsCalculator.h" />
     <ClInclude Include="mc\MetricsCalculatorInternal.h" />
@@ -164,6 +165,7 @@
     <ClCompile Include="log\NamedPipeMarshallSender.cpp" />
     <ClCompile Include="log\TimePoint.cpp" />
     <ClCompile Include="log\Verbose.cpp" />
+    <ClCompile Include="mc\GamingQoS.cpp" />
     <ClCompile Include="mc\MetricsCalculator.cpp" />
     <ClCompile Include="mc\MetricsCalculatorCpuGpu.cpp" />
     <ClCompile Include="mc\MetricsCalculatorDisplay.cpp" />

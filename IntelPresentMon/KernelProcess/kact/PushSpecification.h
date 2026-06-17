@@ -133,7 +133,22 @@ namespace ACT_NS
             }
         };
 
-        using Widget = std::variant<Graph, Readout>;
+        struct Qos
+        {
+            bool showLabel;
+            float fontSize;
+            Color fontColor;
+            Color backgroundColor;
+
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(showLabel),
+                    CEREAL_NVP(fontSize),
+                    CEREAL_NVP(fontColor),
+                    CEREAL_NVP(backgroundColor));
+            }
+        };
+
+        using Widget = std::variant<Graph, Readout, Qos>;
 
         struct Params
         {

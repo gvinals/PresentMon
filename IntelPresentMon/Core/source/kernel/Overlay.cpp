@@ -5,6 +5,7 @@
 #include <Core/source/gfx/layout/FlexElement.h>
 #include <Core/source/gfx/layout/TextElement.h>
 #include <Core/source/gfx/layout/ReadoutElement.h>
+#include <Core/source/gfx/layout/QosReadoutElement.h>
 #include <Core/source/pmon/PresentMon.h>
 #include <Core/source/pmon/RawFrameDataWriter.h>
 #include <Core/source/pmon/Timekeeper.h>
@@ -76,6 +77,18 @@ namespace p2c::kern
                         pReadoutContainer->AddChild(gfx::lay::ReadoutElement::Make(
                             metInfo.isNonNumeric, std::move(metInfo.fullName), std::move(metInfo.unitLabel),
                             mapper[pReadoutSpec->metric].textData.get(), { pReadoutSpec->tag }
+                        ));
+                    }
+                    else if (auto pQosSpec = std::get_if<QosReadoutSpec>(&w)) {
+                        if (!pReadoutContainer) {
+                            pReadoutContainer = gfx::lay::FlexElement::Make({}, { "readout-container" });
+                            pRoot->AddChild(pReadoutContainer);
+                        }
+
+                        pReadoutContainer->AddChild(gfx::lay::QosReadoutElement::Make(
+                            pQosSpec->label,
+                            mapper[pQosSpec->metric].textData.get(),
+                            { pQosSpec->tag }
                         ));
                     }
                     else {
@@ -168,6 +181,9 @@ namespace p2c::kern
             // if widget is a readout
             else if (auto pReadoutSpec = std::get_if<ReadoutSpec>(&w)) {
                 pPackMapper->AddReadout(pReadoutSpec->metric);
+            }
+            else if (auto pQosSpec = std::get_if<QosReadoutSpec>(&w)) {
+                pPackMapper->AddReadout(pQosSpec->metric);
             }
         }
         // remove stale data packs, register new query, fill new fetchers

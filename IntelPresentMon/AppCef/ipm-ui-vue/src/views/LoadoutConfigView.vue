@@ -146,6 +146,7 @@ const removeWidget = (widgetIdx:number) => {
     </v-row>
     <div class="add-btn-row">
         <v-btn @click="addWidget()" class="add-btn" variant="tonal" height="48" color="white">Add New Widget</v-btn>
+        <v-btn @click="loadout.addQos()" class="add-btn ml-3" variant="tonal" height="48" color="white">Add Gaming QoS</v-btn>
     </div>
 
     <v-row>

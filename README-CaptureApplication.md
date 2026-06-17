@@ -123,16 +123,29 @@ In Debug configuration, the application will halt with a modal error dialog when
 |Displayed Frame Time||The time between when the previous frame was displayed and this frame was, in milliseconds|D|
 |Presented Frame Time||The time between this Present call and the previous one, in milliseconds|D|
 |Between App Start|MsBetweenAppStart|How long it took from the start of this frame until the CPU started working on the next frame, in milliseconds.|F|
+|Gaming QoS Score|GamingQoS|Composite gaming quality score from 0-100 based on presented FPS lows, PC latency, and animation error|D|
 
 *Query Type Codes: **D** = Dynamic Query, **F** = Frame Event Query, **S** = Static Query
+
+## Gaming QoS
+
+Gaming QoS summarizes frame experience as a **score from 0-100** and a **letter grade** (S+, S, A, B, C, D, F). It is shown on the optional **Gaming QoS** overlay widget, available through the PresentMon API2 metric `PM_METRIC_GAMING_QOS_SCORE` (poll with `PM_STAT_AVG` on a dynamic query), and written to the capture `*-stats.csv` file when **Generate Stats** is enabled.
+
+The score uses four equally weighted pillars (missing pillars are omitted and weights are renormalized):
+
+- **Presented FPS 1% low / average** (higher ratio is better)
+- **Presented FPS 5% low / average** (higher ratio is better)
+- **PC latency** (linear from 20 ms = best to 60 ms = worst; uses average `MsPCLatency` over the window)
+- **Animation error** (linear from 0.5 ms p95 = best to 2.0 ms p95 = worst; uses absolute animation error)
+
+Grades: S+ at 99+, S at 96-100, A at 90-95, B at 80-89, C at 70-79, D at 60-69, F below 60.
 
 ## Comma-separated value (CSV) file output
 
 ### CSV file names
 
 The PresentMon capture application creates two CSV files per capture. The first records the raw frame data of the capture and is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS.csv".
-The second CSV file generated is a stats summary file for the capture. It includes the duration of the capture, the total number of frames captured, plus the average, minimum, maximum, 99th, 95th and
-90th FPS percentiles. The stats file is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS-stats.csv". All files are stored in the user's appdata local directory in the "Intel\PresentMon\Capture" folder.
+The second CSV file generated is a stats summary file for the capture. It includes the duration of the capture, the total number of frames captured, FPS percentiles, animation error summaries, and **Gaming QoS** score/grade plus optional subscore columns. The stats file is named using the following pattern: "pmcap-[executablename]-YYMMDD-HHMMSS-stats.csv". All files are stored in the user's appdata local directory in the "Intel\PresentMon\Capture" folder.
 
 ## Implementation
 

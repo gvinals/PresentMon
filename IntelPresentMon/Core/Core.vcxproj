@@ -24,6 +24,7 @@
     <ClInclude Include="source\gfx\layout\HistogramPlotElement.h" />
     <ClInclude Include="source\gfx\layout\LinePlotElement.h" />
     <ClInclude Include="source\gfx\layout\PlotElement.h" />
+    <ClInclude Include="source\gfx\layout\QosReadoutElement.h" />
     <ClInclude Include="source\gfx\layout\ReadoutElement.h" />
     <ClInclude Include="source\gfx\layout\style\Attributes.h" />
     <ClInclude Include="source\gfx\layout\style\AttributeUtils.h" />
@@ -104,6 +105,7 @@
     <ClCompile Include="source\gfx\layout\HistogramPlotElement.cpp" />
     <ClCompile Include="source\gfx\layout\LinePlotElement.cpp" />
     <ClCompile Include="source\gfx\layout\PlotElement.cpp" />
+    <ClCompile Include="source\gfx\layout\QosReadoutElement.cpp" />
     <ClCompile Include="source\gfx\layout\ReadoutElement.cpp" />
     <ClCompile Include="source\gfx\layout\style\RawAttributeHelpers.cpp" />
     <ClCompile Include="source\gfx\layout\style\Selector.cpp" />

@@ -47,7 +47,7 @@ namespace p2c::pmon
 
 	const uint8_t* DynamicQuery::GetBlobData() const
 	{
-		if (blobs.GetNumBlobsPopulated() == 0) {
+		if (!query) {
 			return nullptr;
 		}
 		return blobs.GetFirst();

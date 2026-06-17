@@ -36,6 +36,7 @@ namespace p2c::pmon
 		std::optional<std::wstring> frameStatsPath;
 		std::unique_ptr<StatisticsTracker> pStatsTracker;
 		std::unique_ptr<StatisticsTracker> pAnimationErrorTracker;
+		std::unique_ptr<StatisticsTracker> pPcLatencyTracker;
 		pmapi::BlobContainer blobs;
 		double startTime = -1.;
 		double endTime = -1.;

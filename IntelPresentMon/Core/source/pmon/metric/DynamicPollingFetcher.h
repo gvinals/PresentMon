@@ -7,6 +7,7 @@
 #include "MetricFetcher.h"
 #include "../DynamicQuery.h"
 #include <CommonUtilities//str/String.h>
+#include <cmath>
 #include <concepts>
 #include <limits>
 
@@ -38,7 +39,11 @@ namespace p2c::pmon::met
         {
             if constexpr (std::integral<T> || std::floating_point<T>) {
                 if (auto pBlobBytes = pQuery_->GetBlobData()) {
-                    return scale_ * (float)*reinterpret_cast<const T*>(&pBlobBytes[offset_]);
+                    const float scaled = scale_ * (float)*reinterpret_cast<const T*>(&pBlobBytes[offset_]);
+                    if (!std::isfinite(scaled)) {
+                        return {};
+                    }
+                    return scaled;
                 }
                 return {};
             }

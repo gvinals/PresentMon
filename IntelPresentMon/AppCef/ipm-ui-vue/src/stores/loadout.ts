@@ -7,6 +7,7 @@ import { signature, type LoadoutFile } from '@/core/loadout'
 import type { QualifiedMetric } from '@/core/qualified-metric'
 import { makeDefaultGraph, type Graph } from '@/core/graph'
 import { makeDefaultReadout, type Readout } from '@/core/readout'
+import { makeDefaultQos } from '@/core/qos'
 import { makeDefaultWidgetMetric, type WidgetMetric, resetKeySequence as resetWidgetMetricKeySequence } from '@/core/widget-metric'
 import { debounce, type DelayedTask } from '@/core/timing'
 import { migrateLoadout } from '@/core/loadout-migration'
@@ -68,6 +69,25 @@ export const useLoadoutStore = defineStore('loadout', () => {
             desiredUnitId: 0
         }
         widgets.value.push(makeDefaultGraph(qualifiedMetric))
+    }
+
+    function gamingQoSQualifiedMetric(): QualifiedMetric {
+        const metric = intro.metrics.find((m) => m.name.includes('Gaming QoS'))
+        if (!metric) {
+            throw new Error('Gaming QoS metric not found in introspection data')
+        }
+        const statId = metric.availableStatIds.includes(1) ? 1 : metric.availableStatIds[0]
+        return {
+            metricId: metric.id,
+            arrayIndex: 0,
+            statId,
+            deviceId: 0,
+            desiredUnitId: 0,
+        }
+    }
+
+    async function addQos() {
+        widgets.value.push(makeDefaultQos(gamingQoSQualifiedMetric()))
     }
 
     async function addReadout() {
@@ -140,6 +160,8 @@ export const useLoadoutStore = defineStore('loadout', () => {
         let newWidget: Widget
         if (type === WidgetType.Graph) {
             newWidget = makeDefaultGraph(qualifiedMetric)
+        } else if (type === WidgetType.Qos) {
+            newWidget = makeDefaultQos(gamingQoSQualifiedMetric())
         } else {
             newWidget = makeDefaultReadout(qualifiedMetric)
         }
@@ -196,6 +218,7 @@ export const useLoadoutStore = defineStore('loadout', () => {
         widgets,
         addGraph,
         addReadout,
+        addQos,
         removeWidget,
         setWidgetMetrics,
         addWidgetMetric,
