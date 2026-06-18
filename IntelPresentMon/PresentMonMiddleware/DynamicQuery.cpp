@@ -135,6 +135,7 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 
 	std::unordered_map<TelemetryBindingKey_, MetricBinding*> telemetryBindings;
 	MetricBinding* frameBinding = nullptr;
+	MetricBinding* gamingQoSBinding = nullptr;
 	bool hasGamingQoSMetric = false;
 
 	size_t blobCursor = 0;
@@ -143,7 +144,7 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 		const auto metricView = introRoot.FindMetric(qel.metric);
 		const auto metricType = metricView.GetType();
 		const bool isStaticMetric = metricType == PM_METRIC_TYPE_STATIC;
-		const bool isGamingQoSMetric = qel.metric == PM_METRIC_GAMING_QOS_SCORE;
+		const bool isGamingQoSMetric = qel.metric == PM_METRIC_GAMING_QOS_SCORE || qel.metric == PM_METRIC_GAMING_QOS_GRADE;
 		const bool isFrameMetric = !isStaticMetric && !isGamingQoSMetric && qel.deviceId == ipc::kUniversalDeviceId;
 		if (isStaticMetric) {
 			auto bindingPtr = MakeStaticMetricBinding(qel, middleware);
@@ -151,10 +152,14 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 			ringMetricPtrs_.push_back(std::move(bindingPtr));
 		}
 		else if (isGamingQoSMetric) {
-			auto bindingPtr = MakeGamingQoSMetricBinding(qel);
-			binding = bindingPtr.get();
-			hasGamingQoSMetric = true;
-			ringMetricPtrs_.push_back(std::move(bindingPtr));
+			binding = gamingQoSBinding;
+			if (!binding) {
+				auto bindingPtr = MakeGamingQoSMetricBinding(qel);
+				binding = bindingPtr.get();
+				gamingQoSBinding = binding;
+				hasGamingQoSMetric = true;
+				ringMetricPtrs_.push_back(std::move(bindingPtr));
+			}
 		}
 		else if (qel.deviceId == ipc::kUniversalDeviceId) {
 			binding = frameBinding;

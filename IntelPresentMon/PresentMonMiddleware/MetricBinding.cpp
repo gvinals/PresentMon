@@ -10,8 +10,10 @@
 #include "../CommonUtilities/mc/GamingQoS.h"
 #include "../CommonUtilities/mc/MetricsTypes.h"
 #include <algorithm>
+#include <algorithm>
 #include <cassert>
 #include <limits>
+#include <optional>
 #include <utility>
 
 namespace pmon::mid
@@ -196,20 +198,33 @@ namespace pmon::mid
 
             void AddMetricStat(PM_QUERY_ELEMENT& qel, const pmapi::intro::Root& intro) override
             {
-                if (qel.metric != PM_METRIC_GAMING_QOS_SCORE) {
+                if (qel.metric == PM_METRIC_GAMING_QOS_SCORE) {
+                    if (qel.stat != PM_STAT_AVG) {
+                        throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
+                            "Gaming QoS score metric requires PM_STAT_AVG");
+                    }
+
+                    const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_DOUBLE);
+                    qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
+                    qel.dataSize = dataSize;
+                    scoreOffset_ = qel.dataOffset;
+                }
+                else if (qel.metric == PM_METRIC_GAMING_QOS_GRADE) {
+                    if (qel.stat != PM_STAT_NONE) {
+                        throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
+                            "Gaming QoS grade metric requires PM_STAT_NONE");
+                    }
+
+                    const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_STRING);
+                    qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
+                    qel.dataSize = dataSize;
+                    gradeOffset_ = qel.dataOffset;
+                }
+                else {
                     pmlog_error("Gaming QoS binding received unexpected metric").pmwatch((int)qel.metric);
                     assert(false);
                     return;
                 }
-                if (qel.stat != PM_STAT_AVG) {
-                    throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
-                        "Gaming QoS score metric requires PM_STAT_AVG");
-                }
-
-                const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_DOUBLE);
-                qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
-                qel.dataSize = dataSize;
-                scoreOffset_ = qel.dataOffset;
 
                 if (!internalRegistered_) {
                     RegisterInternalStats_(intro);
@@ -240,12 +255,25 @@ namespace pmon::mid
                 };
 
                 const auto result = util::metrics::ComputeGamingQoS(inputs);
-                auto* pScore = reinterpret_cast<double*>(pBlobBase + scoreOffset_);
-                if (result.scoreValid) {
-                    *pScore = result.score;
+                if (scoreOffset_.has_value()) {
+                    auto* pScore = reinterpret_cast<double*>(pBlobBase + *scoreOffset_);
+                    if (result.scoreValid) {
+                        *pScore = result.score;
+                    }
+                    else {
+                        *pScore = std::numeric_limits<double>::quiet_NaN();
+                    }
                 }
-                else {
-                    *pScore = std::numeric_limits<double>::quiet_NaN();
+                if (gradeOffset_.has_value()) {
+                    auto* pGrade = reinterpret_cast<char*>(pBlobBase + *gradeOffset_);
+                    std::fill_n(pGrade, PM_MAX_PATH, '\0');
+                    if (result.scoreValid) {
+                        const auto grade = util::metrics::GamingQoSGradeFromScore(result.score, false);
+                        strncpy_s(pGrade, PM_MAX_PATH, grade.c_str(), _TRUNCATE);
+                    }
+                    else {
+                        strncpy_s(pGrade, PM_MAX_PATH, "NA", _TRUNCATE);
+                    }
                 }
             }
 
@@ -305,7 +333,8 @@ namespace pmon::mid
             FrameMetricBinding_ frameBinding_{ PM_QUERY_ELEMENT{} };
             mutable std::array<uint8_t, 256> internalBlob_{};
             std::vector<PM_QUERY_ELEMENT> internalStats_;
-            uint64_t scoreOffset_ = 0;
+            std::optional<uint64_t> scoreOffset_;
+            std::optional<uint64_t> gradeOffset_;
             bool internalRegistered_ = false;
         };
 

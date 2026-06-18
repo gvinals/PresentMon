@@ -61,7 +61,8 @@ namespace p2c::kern
 
     struct QosReadoutSpec
     {
-        QualifiedMetric metric;
+        QualifiedMetric scoreMetric;
+        QualifiedMetric gradeMetric;
         std::wstring label;
         std::string tag;
     };

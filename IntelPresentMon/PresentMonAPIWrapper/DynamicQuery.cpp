@@ -118,13 +118,12 @@ namespace pmapi
 
     DynamicQuery::DynamicQuery(PM_SESSION_HANDLE hSession, std::span<PM_QUERY_ELEMENT> elements, double winSizeMs, double metricOffsetMs)
     {
+        uint32_t registeredBlobSize = 0u;
         if (auto sta = pmRegisterDynamicQuery(hSession, &hQuery_, elements.data(),
-            elements.size(), winSizeMs, metricOffsetMs); sta != PM_STATUS_SUCCESS) {
+            elements.size(), winSizeMs, metricOffsetMs, &registeredBlobSize); sta != PM_STATUS_SUCCESS) {
             throw ApiErrorException{ sta, "dynamic query register call failed" };
         }
-        if (elements.size() > 0) {
-            blobSize_ = elements.back().dataOffset + elements.back().dataSize;
-        }
+        blobSize_ = registeredBlobSize;
     }
 
     void DynamicQuery::Clear_() noexcept

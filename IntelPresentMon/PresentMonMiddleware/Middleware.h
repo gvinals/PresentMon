@@ -37,7 +37,7 @@ namespace pmon::mid
 		void SetTelemetryPollingPeriod(uint32_t deviceId, std::optional<uint32_t> periodMs);
 		void SetEtwFlushPeriod(std::optional<uint32_t> periodMs);
 		void FlushFrames(uint32_t processId);
-		PM_DYNAMIC_QUERY* RegisterDynamicQuery(std::span<PM_QUERY_ELEMENT> queryElements, double windowSizeMs, double metricOffsetMs);
+		PM_DYNAMIC_QUERY* RegisterDynamicQuery(std::span<PM_QUERY_ELEMENT> queryElements, double windowSizeMs, double metricOffsetMs, uint32_t& blobSize);
 		void FreeDynamicQuery(const PM_DYNAMIC_QUERY* pQuery);
 		void PollDynamicQuery(const PM_DYNAMIC_QUERY* pQuery, uint32_t processId, uint8_t* pBlob,
 			uint32_t* numSwapChains, std::optional<uint64_t> nowTimestamp = {});

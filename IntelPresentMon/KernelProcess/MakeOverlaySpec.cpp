@@ -438,12 +438,19 @@ namespace kproc
                     const auto tag = std::format("q{}", i);
 
                     pSpec->widgets.push_back(kern::QosReadoutSpec{
-                        .metric = {
+                        .scoreMetric = {
                             .metricId = PM_METRIC_GAMING_QOS_SCORE,
                             .statId = PM_STAT_AVG,
                             .arrayIndex = 0,
                             .deviceId = 0,
                             .unitId = PM_UNIT_PERCENT,
+                        },
+                        .gradeMetric = {
+                            .metricId = PM_METRIC_GAMING_QOS_GRADE,
+                            .statId = PM_STAT_NONE,
+                            .arrayIndex = 0,
+                            .deviceId = 0,
+                            .unitId = PM_UNIT_DIMENSIONLESS,
                         },
                         .label = L"Gaming QoS",
                         .tag = tag,

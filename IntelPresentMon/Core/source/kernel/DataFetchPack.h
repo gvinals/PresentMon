@@ -12,6 +12,9 @@ namespace p2c::kern
 		// functions
 		void Populate(double timestamp)
 		{
+			if (!pFetcher) {
+				return;
+			}
 			if (graphData) {
 				graphData->Push({ gfx::lay::DataPoint{.value = pFetcher->ReadValue(), .time = timestamp} });
 				graphData->Trim(timestamp);

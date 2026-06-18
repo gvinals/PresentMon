@@ -314,7 +314,7 @@ PRESENTMON_API2_EXPORT PM_STATUS pmFlushFrames(PM_SESSION_HANDLE handle, uint32_
 }
 
 PRESENTMON_API2_EXPORT PM_STATUS pmRegisterDynamicQuery(PM_SESSION_HANDLE sessionHandle, PM_DYNAMIC_QUERY_HANDLE* pQueryHandle,
-	PM_QUERY_ELEMENT* pElements, uint64_t numElements, double windowSizeMs, double metricOffsetMs)
+	PM_QUERY_ELEMENT* pElements, uint64_t numElements, double windowSizeMs, double metricOffsetMs, uint32_t* pBlobSize)
 {
 	try {
 		pmlog_dbg("pmRegisterDynamicQuery")
@@ -323,7 +323,8 @@ PRESENTMON_API2_EXPORT PM_STATUS pmRegisterDynamicQuery(PM_SESSION_HANDLE sessio
 			.watch("pElements", DescribePointerArg_(pElements, false))
 			.pmwatch(numElements)
 			.pmwatch(windowSizeMs)
-			.pmwatch(metricOffsetMs);
+			.pmwatch(metricOffsetMs)
+			.watch("pBlobSize_out", DescribePointerArg_(pBlobSize, false));
 		if (!pElements) {
 			pmlog_error("null pointer to query element array argument").diag();
 			return PM_STATUS_BAD_ARGUMENT;
@@ -332,10 +333,16 @@ PRESENTMON_API2_EXPORT PM_STATUS pmRegisterDynamicQuery(PM_SESSION_HANDLE sessio
 			pmlog_error("zero length query element array").diag();
 			return PM_STATUS_BAD_ARGUMENT;
 		}
+		if (!pBlobSize) {
+			pmlog_error("null pointer to blob size argument").diag();
+			return PM_STATUS_BAD_ARGUMENT;
+		}
+		uint32_t blobSize = 0u;
 		const auto queryHandle = LookupMiddlewareCheckDropped_(sessionHandle).RegisterDynamicQuery(
-			{pElements, numElements}, windowSizeMs, metricOffsetMs);
+			{pElements, numElements}, windowSizeMs, metricOffsetMs, blobSize);
 		AddHandleMapping_(sessionHandle, queryHandle);
 		*pQueryHandle = queryHandle;
+		*pBlobSize = blobSize;
 		return PM_STATUS_SUCCESS;
 	}
 	pmcatch_report_diag(true);

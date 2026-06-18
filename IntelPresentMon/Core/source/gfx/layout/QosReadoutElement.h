@@ -10,18 +10,19 @@ namespace p2c::gfx::lay
 	class QosReadoutElement : public FlexElement
 	{
 	public:
-		QosReadoutElement(std::wstring label, std::wstring* pScoreText, std::vector<std::string> classes = {});
+		QosReadoutElement(std::wstring label, std::wstring* pGradeText, std::wstring* pScoreText, std::vector<std::string> classes = {});
 		QosReadoutElement(const QosReadoutElement&) = delete;
 		QosReadoutElement& operator=(const QosReadoutElement&) = delete;
 		~QosReadoutElement() override;
-		static std::shared_ptr<Element> Make(std::wstring label, std::wstring* pScoreText, std::vector<std::string> classes = {});
+		static std::shared_ptr<Element> Make(std::wstring label, std::wstring* pGradeText, std::wstring* pScoreText, std::vector<std::string> classes = {});
 	protected:
 		void Draw_(Graphics& gfx) const override;
 	private:
 		std::shared_ptr<TextElement> pGrade;
 		std::shared_ptr<TextElement> pScore;
+		std::wstring* pGradeText;
 		std::wstring* pScoreText;
-		mutable std::wstring lastScoreText;
 		mutable std::wstring lastGradeText;
+		mutable std::wstring lastScoreText;
 	};
 }

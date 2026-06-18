@@ -12,7 +12,12 @@ namespace p2c::pmon::met
         std::shared_ptr<DynamicQuery> pQuery)
         :
         pQuery_{ std::move(pQuery) },
-        offset_{ (uint32_t)qel.dataOffset }
+        metric_{ qel.metric },
+        stat_{ qel.stat },
+        deviceId_{ qel.deviceId },
+        arrayIndex_{ qel.arrayIndex },
+        offset_{ (uint32_t)qel.dataOffset },
+        dataSize_{ qel.dataSize }
     {
         // overlay will always indicate preferred unit in the widget labels
         // so we must scale from output unit if necessary to match
@@ -33,7 +38,8 @@ namespace p2c::pmon::met
     std::wstring TypedDynamicPollingFetcher<PM_ENUM>::ReadStringValue()
     {
         if (auto pBlobBytes = pQuery_->GetBlobData()) {
-            return pKeyMap_->at(*reinterpret_cast<const int*>(&pBlobBytes[offset_])).wideName;
+            const auto offset = ResolveOffset_();
+            return pKeyMap_->at(*reinterpret_cast<const int*>(&pBlobBytes[offset])).wideName;
         }
         return {};
     }

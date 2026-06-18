@@ -10,7 +10,7 @@
 #include <cstdint>
 
 #define PM_API_VERSION_MAJOR 3
-#define PM_API_VERSION_MINOR 5
+#define PM_API_VERSION_MINOR 6
 
 #define PM_MAX_PATH 260
 
@@ -142,6 +142,7 @@ extern "C" {
 		PM_METRIC_SESSION_START_QPC,
 		PM_METRIC_CPU_CORE_TEMPERATURE,
 		PM_METRIC_GAMING_QOS_SCORE,
+		PM_METRIC_GAMING_QOS_GRADE,
 		PM_METRIC_COUNT_, // sentry to mark end of metric list; not an actual query metric
 	};
 
@@ -435,7 +436,7 @@ extern "C" {
 	// flush any buffered frame event data for the specified process on this session
 	PRESENTMON_API2_EXPORT PM_STATUS pmFlushFrames(PM_SESSION_HANDLE handle, uint32_t processId);
 	// register a dynamic query used for polling metric data with (optional) statistic processing such as average or percentile
-	PRESENTMON_API2_EXPORT PM_STATUS pmRegisterDynamicQuery(PM_SESSION_HANDLE sessionHandle, PM_DYNAMIC_QUERY_HANDLE* pHandle, PM_QUERY_ELEMENT* pElements, uint64_t numElements, double windowSizeMs, double metricOffsetMs);
+	PRESENTMON_API2_EXPORT PM_STATUS pmRegisterDynamicQuery(PM_SESSION_HANDLE sessionHandle, PM_DYNAMIC_QUERY_HANDLE* pHandle, PM_QUERY_ELEMENT* pElements, uint64_t numElements, double windowSizeMs, double metricOffsetMs, uint32_t* pBlobSize);
 	// free the resources associated with a registered dynamic query
 	PRESENTMON_API2_EXPORT PM_STATUS pmFreeDynamicQuery(PM_DYNAMIC_QUERY_HANDLE handle);
 	// poll a dynamic query, writing the query poll results into the specified memory blob (byte buffer)

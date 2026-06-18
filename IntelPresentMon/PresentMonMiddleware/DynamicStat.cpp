@@ -6,6 +6,8 @@
 #include "../../PresentData/PresentEventEnums.hpp"
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <limits>
 #include <optional>
 
 namespace ipc = pmon::ipc;
@@ -19,7 +21,8 @@ namespace pmon::mid
         void WriteOptionalValueToBlob_(uint8_t* pBase, size_t offsetBytes, PM_DATA_TYPE outType, const std::optional<T>& value)
         {
             auto* pTarget = pBase + offsetBytes;
-            const double doubleVal = value ? DynamicStatSampleAdapter<T>::ToDouble(*value) : 0.0;
+            const double doubleVal = value ? DynamicStatSampleAdapter<T>::ToDouble(*value)
+                : std::numeric_limits<double>::quiet_NaN();
             const uint64_t uint64Val = value ? DynamicStatSampleAdapter<T>::ToUint64(*value) : 0;
             switch (outType) {
             case PM_DATA_TYPE_DOUBLE:

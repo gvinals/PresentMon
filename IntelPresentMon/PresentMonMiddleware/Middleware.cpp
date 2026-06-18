@@ -233,10 +233,11 @@ namespace pmon::mid
     }
 
     PM_DYNAMIC_QUERY* Middleware::RegisterDynamicQuery(std::span<PM_QUERY_ELEMENT> queryElements,
-        double windowSizeMs, double metricOffsetMs)
+        double windowSizeMs, double metricOffsetMs, uint32_t& blobSize)
     {
         const auto qpcPeriod = util::GetTimestampPeriodSeconds();
         auto* query = new PM_DYNAMIC_QUERY{ queryElements, windowSizeMs, metricOffsetMs, qpcPeriod, *pComms_, *this };
+        blobSize = (uint32_t)query->GetBlobSize();
         RegisterMetricUsage_(query, queryElements);
         LogQueryRegistration_(PM_METRIC_TYPE_DYNAMIC, GetIntrospectionRoot_(), query, queryElements);
         return query;
@@ -393,6 +394,9 @@ namespace pmon::mid
         std::vector<QueryMetricKey> keys;
         keys.reserve(queryElements.size());
         for (const auto& element : queryElements) {
+            if (element.metric == PM_METRIC_GAMING_QOS_SCORE || element.metric == PM_METRIC_GAMING_QOS_GRADE) {
+                continue;
+            }
             keys.push_back(QueryMetricKey{
                 .metric = element.metric,
                 .deviceId = element.deviceId,
