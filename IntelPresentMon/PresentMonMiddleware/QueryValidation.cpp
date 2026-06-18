@@ -293,18 +293,11 @@ namespace pmon::mid
                     //}
                 }
                 else {
-                    if (q.metric == PM_METRIC_GAMING_QOS_GRADE) {
-                        if (q.stat != PM_STAT_NONE) {
-                            LogAndThrow("Gaming QoS grade metric requires NONE stat");
-                        }
+                    if (!IsStatSupported_(q.stat, metricView)) {
+                        LogAndThrow("Dynamic metric stat not supported by metric");
                     }
-                    else {
-                        if (!IsStatSupported_(q.stat, metricView)) {
-                            LogAndThrow("Dynamic metric stat not supported by metric");
-                        }
-                        if (!IsDynamicStatSupported_(q.stat)) {
-                            LogAndThrow("Dynamic metric stat not supported by implementation");
-                        }
+                    if (!IsDynamicStatSupported_(q.stat)) {
+                        LogAndThrow("Dynamic metric stat not supported by implementation");
                     }
                 }
             }
@@ -315,15 +308,6 @@ namespace pmon::mid
             const auto queryDataType = isFrameQuery ? frameType : polledType;
             if (ipc::intro::GetDataTypeSize(queryDataType) == 0) {
                 LogAndThrow("Unsupported query data type");
-            }
-
-            if (q.metric == PM_METRIC_GAMING_QOS_GRADE) {
-                if (polledType != PM_DATA_TYPE_STRING) {
-                    LogAndThrow("Gaming QoS grade metric must use string data type");
-                }
-                if (q.deviceId != ipc::kUniversalDeviceId) {
-                    LogAndThrow("Gaming QoS grade metric requires universal device");
-                }
             }
 
             if (q.deviceId != ipc::kUniversalDeviceId) {
@@ -399,7 +383,7 @@ namespace pmon::mid
                 }
             }
 
-            if (isDynamicQuery && !isStaticMetric && q.metric != PM_METRIC_GAMING_QOS_GRADE) {
+            if (isDynamicQuery && !isStaticMetric && q.metric != PM_METRIC_GAMING_QOS_SCORE) {
                 if (!IsSupportedDynamicInputType_(frameType)) {
                     LogAndThrow("Unsupported dynamic stat input data type");
                 }

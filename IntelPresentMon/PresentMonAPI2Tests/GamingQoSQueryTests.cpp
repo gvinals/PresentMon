@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <cstring>
 #include <format>
 #include <memory>
 #include <thread>
@@ -83,14 +82,6 @@ namespace GamingQoSQueryTests
                     .dataOffset = 0,
                     .dataSize = 0,
                 },
-                PM_QUERY_ELEMENT{
-                    .metric = PM_METRIC_GAMING_QOS_GRADE,
-                    .stat = PM_STAT_NONE,
-                    .deviceId = pmon::ipc::kUniversalDeviceId,
-                    .arrayIndex = 0,
-                    .dataOffset = 0,
-                    .dataSize = 0,
-                },
             };
 
             auto query = pSession->RegisterDynamicQuery(elements, 1000.0, 0.0);
@@ -106,8 +97,6 @@ namespace GamingQoSQueryTests
                     const double score = *reinterpret_cast<const double*>(blobs[0] + (size_t)elements[0].dataOffset);
                     if (std::isfinite(score)) {
                         Assert::IsTrue(score >= 0. && score <= 100., L"Gaming QoS score out of range");
-                        const char* grade = reinterpret_cast<const char*>(blobs[0] + (size_t)elements[1].dataOffset);
-                        Assert::IsTrue(std::strlen(grade) > 0, L"Gaming QoS grade string empty");
                         gotFiniteScore = true;
                         break;
                     }
@@ -119,7 +108,7 @@ namespace GamingQoSQueryTests
             tracker.Reset();
         }
 
-        TEST_METHOD(MixedFrameAndQoSQueryBlobSizeCoversGradeString)
+        TEST_METHOD(MixedFrameAndQoSQueryBlobSizeCoversHiddenInputs)
         {
             auto presenter = fixture_.LaunchPresenter({ "/FrameSleep=10"s });
             auto pSession = std::make_unique<pmapi::Session>(fixture_.GetCommonArgs().ctrlPipe);
@@ -131,14 +120,6 @@ namespace GamingQoSQueryTests
                 "gaming-qos-mixed");
 
             std::vector<PM_QUERY_ELEMENT> elements{
-                PM_QUERY_ELEMENT{
-                    .metric = PM_METRIC_GAMING_QOS_GRADE,
-                    .stat = PM_STAT_NONE,
-                    .deviceId = pmon::ipc::kUniversalDeviceId,
-                    .arrayIndex = 0,
-                    .dataOffset = 0,
-                    .dataSize = 0,
-                },
                 PM_QUERY_ELEMENT{
                     .metric = PM_METRIC_GAMING_QOS_SCORE,
                     .stat = PM_STAT_AVG,
@@ -161,7 +142,7 @@ namespace GamingQoSQueryTests
             const auto registeredBlobSize = query.GetBlobSize();
             const auto naiveClientSize = (size_t)elements.back().dataOffset + (size_t)elements.back().dataSize;
             Assert::IsTrue(registeredBlobSize >= MaxQueryElementEnd_(elements),
-                L"Blob size must cover all fields including grade string");
+                L"Blob size must cover all client-visible fields");
             Assert::IsTrue(registeredBlobSize > naiveClientSize,
                 L"Authoritative blob size must exceed last-element extent heuristic");
 
@@ -171,7 +152,7 @@ namespace GamingQoSQueryTests
             while (std::chrono::steady_clock::now() < deadline) {
                 query.Poll(blobs);
                 if (blobs.GetNumBlobsPopulated() > 0) {
-                    const double fps = *reinterpret_cast<const double*>(blobs[0] + (size_t)elements[2].dataOffset);
+                    const double fps = *reinterpret_cast<const double*>(blobs[0] + (size_t)elements[1].dataOffset);
                     if (std::isfinite(fps) && fps > 0.) {
                         gotFps = true;
                         break;

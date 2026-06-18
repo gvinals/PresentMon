@@ -38,7 +38,6 @@ namespace pmon::mid
     };
 
     std::unique_ptr<MetricBinding> MakeFrameMetricBinding(PM_QUERY_ELEMENT& qel);
-    std::unique_ptr<MetricBinding> MakeGamingQoSMetricBinding(PM_QUERY_ELEMENT& qel);
     std::unique_ptr<MetricBinding> MakeTelemetryMetricBinding(PM_QUERY_ELEMENT& qel, const pmapi::intro::Root& intro);
     std::unique_ptr<MetricBinding> MakeStaticMetricBinding(PM_QUERY_ELEMENT& qel, Middleware& middleware);
 }

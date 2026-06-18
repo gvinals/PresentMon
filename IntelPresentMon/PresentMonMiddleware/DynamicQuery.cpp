@@ -4,7 +4,11 @@
 #include "../PresentMonAPIWrapperCommon/Introspection.h"
 #include "../Interprocess/source/SystemDeviceId.h"
 #include "../Interprocess/source/Interprocess.h"
+#include "../Interprocess/source/IntrospectionHelpers.h"
 #include "../CommonUtilities/Hash.h"
+#include "../CommonUtilities/Memory.h"
+#include "../CommonUtilities/mc/GamingQoS.h"
+#include "../CommonUtilities/mc/MetricsTypes.h"
 #include "../CommonUtilities/log/Log.h"
 #include <unordered_map>
 #include <algorithm>
@@ -15,6 +19,9 @@
 #include <chrono>
 #include <cassert>
 #include <cstring>
+#include <cmath>
+#include <limits>
+#include <optional>
 
 using namespace pmon;
 using namespace mid;
@@ -121,6 +128,90 @@ static std::string BuildRelativeMillisecondsText_(uint64_t referenceQpc, uint64_
 	return std::format("{:.4f}", deltaMs);
 }
 
+namespace
+{
+	struct GamingQoSHiddenInputKey_
+	{
+		PM_METRIC metric;
+		PM_STAT stat;
+		bool requirePositive;
+	};
+
+	static constexpr GamingQoSHiddenInputKey_ kGamingQoSHiddenInputs_[] = {
+		{ PM_METRIC_PRESENTED_FPS, PM_STAT_AVG, true },
+		{ PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_01, true },
+		{ PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_05, true },
+		{ PM_METRIC_PC_LATENCY, PM_STAT_AVG, false },
+		{ PM_METRIC_ANIMATION_ERROR, PM_STAT_PERCENTILE_95, false },
+	};
+}
+
+void PM_DYNAMIC_QUERY::EnsureGamingQoSFrameInputs_(MetricBinding* frameBinding,
+	const pmapi::intro::Root& intro, size_t& blobCursor)
+{
+	if (!frameBinding) {
+		throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
+			"Gaming QoS requires frame metric binding");
+	}
+
+	size_t slotIndex = 0;
+	for (const auto& key : kGamingQoSHiddenInputs_) {
+		PM_QUERY_ELEMENT internalQel{
+			.metric = key.metric,
+			.stat = key.stat,
+			.deviceId = ipc::kUniversalDeviceId,
+			.arrayIndex = 0,
+		};
+		internalQel.dataOffset = blobCursor;
+		frameBinding->AddMetricStat(internalQel, intro);
+		gamingQoS_.inputSlots[slotIndex++] = GamingQoSInputSlot_{
+			.blobOffset = internalQel.dataOffset,
+			.metric = key.metric,
+			.requirePositive = key.requirePositive,
+		};
+		blobCursor = (size_t)internalQel.dataOffset + (size_t)internalQel.dataSize;
+	}
+}
+
+void PM_DYNAMIC_QUERY::ApplyGamingQoS_(uint8_t* pBlobBase) const
+{
+	if (!gamingQoS_.enabled || !gamingQoS_.scoreOutputOffset.has_value() || pBlobBase == nullptr) {
+		return;
+	}
+
+	auto readInput = [&](const GamingQoSInputSlot_& slot) -> std::optional<double> {
+		const auto* pValue = reinterpret_cast<const double*>(pBlobBase + slot.blobOffset);
+		const double value = *pValue;
+		if (!std::isfinite(value)) {
+			return std::nullopt;
+		}
+		if (slot.metric == PM_METRIC_PC_LATENCY && util::metrics::IsMissingFrameMetricValue(value)) {
+			return std::nullopt;
+		}
+		if (slot.requirePositive && value <= 0.) {
+			return std::nullopt;
+		}
+		return value;
+	};
+
+	util::metrics::GamingQoSInputs inputs{
+		.avgFps = readInput(gamingQoS_.inputSlots[0]),
+		.low1Fps = readInput(gamingQoS_.inputSlots[1]),
+		.low5Fps = readInput(gamingQoS_.inputSlots[2]),
+		.pcLatencyMs = readInput(gamingQoS_.inputSlots[3]),
+		.aeP95Ms = readInput(gamingQoS_.inputSlots[4]),
+	};
+
+	const auto result = util::metrics::ComputeGamingQoS(inputs);
+	auto* pScore = reinterpret_cast<double*>(pBlobBase + *gamingQoS_.scoreOutputOffset);
+	if (result.scoreValid) {
+		*pScore = result.score;
+	}
+	else {
+		*pScore = std::numeric_limits<double>::quiet_NaN();
+	}
+}
+
 PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double windowSizeMs,
 	double windowOffsetMs, double qpcPeriodSeconds, ipc::MiddlewareComms& comms, pmon::mid::Middleware& middleware)
 	:
@@ -135,8 +226,6 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 
 	std::unordered_map<TelemetryBindingKey_, MetricBinding*> telemetryBindings;
 	MetricBinding* frameBinding = nullptr;
-	MetricBinding* gamingQoSBinding = nullptr;
-	bool hasGamingQoSMetric = false;
 
 	size_t blobCursor = 0;
 	for (auto& qel : qels) {
@@ -144,22 +233,32 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 		const auto metricView = introRoot.FindMetric(qel.metric);
 		const auto metricType = metricView.GetType();
 		const bool isStaticMetric = metricType == PM_METRIC_TYPE_STATIC;
-		const bool isGamingQoSMetric = qel.metric == PM_METRIC_GAMING_QOS_SCORE || qel.metric == PM_METRIC_GAMING_QOS_GRADE;
-		const bool isFrameMetric = !isStaticMetric && !isGamingQoSMetric && qel.deviceId == ipc::kUniversalDeviceId;
+		const bool isGamingQoSScore = qel.metric == PM_METRIC_GAMING_QOS_SCORE;
+		const bool isFrameMetric = !isStaticMetric && !isGamingQoSScore && qel.deviceId == ipc::kUniversalDeviceId;
+
+		if (isGamingQoSScore) {
+			if (qel.stat != PM_STAT_AVG) {
+				throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
+					"Gaming QoS score metric requires PM_STAT_AVG");
+			}
+			if (qel.deviceId != ipc::kUniversalDeviceId) {
+				throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
+					"Gaming QoS score metric requires universal device");
+			}
+			gamingQoS_.enabled = true;
+			const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_DOUBLE);
+			qel.dataOffset = blobCursor;
+			qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
+			qel.dataSize = dataSize;
+			gamingQoS_.scoreOutputOffset = qel.dataOffset;
+			blobCursor = (size_t)qel.dataOffset + (size_t)qel.dataSize;
+			continue;
+		}
+
 		if (isStaticMetric) {
 			auto bindingPtr = MakeStaticMetricBinding(qel, middleware);
 			binding = bindingPtr.get();
 			ringMetricPtrs_.push_back(std::move(bindingPtr));
-		}
-		else if (isGamingQoSMetric) {
-			binding = gamingQoSBinding;
-			if (!binding) {
-				auto bindingPtr = MakeGamingQoSMetricBinding(qel);
-				binding = bindingPtr.get();
-				gamingQoSBinding = binding;
-				hasGamingQoSMetric = true;
-				ringMetricPtrs_.push_back(std::move(bindingPtr));
-			}
 		}
 		else if (qel.deviceId == ipc::kUniversalDeviceId) {
 			binding = frameBinding;
@@ -211,11 +310,26 @@ PM_DYNAMIC_QUERY::PM_DYNAMIC_QUERY(std::span<PM_QUERY_ELEMENT> qels, double wind
 		}
 	}
 
+	if (gamingQoS_.enabled) {
+		if (!frameBinding) {
+			PM_QUERY_ELEMENT frameSeed{
+				.metric = PM_METRIC_PRESENTED_FPS,
+				.stat = PM_STAT_AVG,
+				.deviceId = ipc::kUniversalDeviceId,
+				.arrayIndex = 0,
+			};
+			auto bindingPtr = MakeFrameMetricBinding(frameSeed);
+			frameBinding = bindingPtr.get();
+			ringMetricPtrs_.push_back(std::move(bindingPtr));
+		}
+		EnsureGamingQoSFrameInputs_(frameBinding, introRoot, blobCursor);
+	}
+
 	for (auto& binding : ringMetricPtrs_) {
 		binding->Finalize();
 	}
 
-	hasFrameMetrics_ = frameBinding != nullptr || hasGamingQoSMetric;
+	hasFrameMetrics_ = frameBinding != nullptr || gamingQoS_.enabled;
 
 	// make sure blob sizes are multiple of 16 bytes for blob array alignment purposes
 	blobSize_ = util::PadToAlignment(blobCursor, 16u);
@@ -468,6 +582,7 @@ uint32_t PM_DYNAMIC_QUERY::Poll(uint8_t* pBlobBase, ipc::MiddlewareComms& comms,
 		for (auto& pRing : ringMetricPtrs_) {
 			pRing->Poll(window, pBlob, comms, pSwapChain, processId);
 		}
+		ApplyGamingQoS_(pBlob);
 		if (hasFrameSamples) {
 			UpdateFrameMetricCache_(pBlob);
 		}

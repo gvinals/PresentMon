@@ -25,6 +25,11 @@ namespace pmon::ipc
 	class MiddlewareComms;
 }
 
+namespace pmapi::intro
+{
+	class Root;
+}
+
 struct PM_DYNAMIC_QUERY
 {
 public:
@@ -58,7 +63,24 @@ private:
 		std::array<uint8_t, sizeof(uint64_t)> bytes{};
 	};
 
+	struct GamingQoSInputSlot_
+	{
+		uint64_t blobOffset = 0;
+		PM_METRIC metric = PM_METRIC_COUNT_;
+		bool requirePositive = false;
+	};
+
+	struct GamingQoSDerivation_
+	{
+		bool enabled = false;
+		std::optional<uint64_t> scoreOutputOffset;
+		std::array<GamingQoSInputSlot_, 5> inputSlots{};
+	};
+
 	// functions
+	void EnsureGamingQoSFrameInputs_(pmon::mid::MetricBinding* frameBinding,
+		const pmapi::intro::Root& intro, size_t& blobCursor);
+	void ApplyGamingQoS_(uint8_t* pBlobBase) const;
 	pmon::mid::DynamicQueryWindow GenerateQueryWindow_(int64_t nowTimestamp) const;
 	void ValidatePendingIntegrityWindows_(pmon::mid::FrameMetricsSource* frameSource,
 		pmon::ipc::MiddlewareComms& comms,
@@ -79,5 +101,6 @@ private:
 	int64_t windowOffsetQpc_ = 0;
 	// window integrity validation data
 	mutable std::unordered_map<uint64_t, IntegrityTrackingState_> swapToIntegrityState_;
+	GamingQoSDerivation_ gamingQoS_;
 };
 

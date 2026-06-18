@@ -87,7 +87,6 @@ namespace p2c::kern
 
                         pReadoutContainer->AddChild(gfx::lay::QosReadoutElement::Make(
                             pQosSpec->label,
-                            mapper[pQosSpec->gradeMetric].textData.get(),
                             mapper[pQosSpec->scoreMetric].textData.get(),
                             { pQosSpec->tag }
                         ));
@@ -185,7 +184,6 @@ namespace p2c::kern
             }
             else if (auto pQosSpec = std::get_if<QosReadoutSpec>(&w)) {
                 pPackMapper->AddReadout(pQosSpec->scoreMetric);
-                pPackMapper->AddReadout(pQosSpec->gradeMetric);
             }
         }
         // remove stale data packs, register new query, fill new fetchers

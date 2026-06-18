@@ -25,28 +25,6 @@ namespace p2c::pmon
 		return elements;
 	}
 
-	std::optional<size_t> DynamicQuery::FindElementDataOffset(PM_METRIC metric, PM_STAT stat, uint32_t deviceId, uint32_t arrayIndex) const
-	{
-		for (const auto& element : elements) {
-			if (element.metric == metric && element.stat == stat &&
-				element.deviceId == deviceId && element.arrayIndex == arrayIndex) {
-				return (size_t)element.dataOffset;
-			}
-		}
-		return std::nullopt;
-	}
-
-	std::optional<size_t> DynamicQuery::FindElementDataSize(PM_METRIC metric, PM_STAT stat, uint32_t deviceId, uint32_t arrayIndex) const
-	{
-		for (const auto& element : elements) {
-			if (element.metric == metric && element.stat == stat &&
-				element.deviceId == deviceId && element.arrayIndex == arrayIndex) {
-				return (size_t)element.dataSize;
-			}
-		}
-		return std::nullopt;
-	}
-
 	void DynamicQuery::Poll(const pmapi::ProcessTracker& tracker)
 	{
 		if (query) {

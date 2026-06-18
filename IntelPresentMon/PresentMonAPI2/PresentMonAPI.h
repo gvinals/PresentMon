@@ -142,7 +142,6 @@ extern "C" {
 		PM_METRIC_SESSION_START_QPC,
 		PM_METRIC_CPU_CORE_TEMPERATURE,
 		PM_METRIC_GAMING_QOS_SCORE,
-		PM_METRIC_GAMING_QOS_GRADE,
 		PM_METRIC_COUNT_, // sentry to mark end of metric list; not an actual query metric
 	};
 

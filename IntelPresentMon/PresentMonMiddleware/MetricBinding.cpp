@@ -7,13 +7,7 @@
 #include "../Interprocess/source/IntrospectionDataTypeMapping.h"
 #include "../Interprocess/source/SystemDeviceId.h"
 #include "../CommonUtilities/Memory.h"
-#include "../CommonUtilities/mc/GamingQoS.h"
-#include "../CommonUtilities/mc/MetricsTypes.h"
-#include <algorithm>
-#include <algorithm>
 #include <cassert>
-#include <limits>
-#include <optional>
 #include <utility>
 
 namespace pmon::mid
@@ -189,155 +183,6 @@ namespace pmon::mid
             }
         };
 
-        class GamingQoSMetricBinding_ : public MetricBinding
-        {
-        public:
-            explicit GamingQoSMetricBinding_(const PM_QUERY_ELEMENT&)
-            {
-            }
-
-            void AddMetricStat(PM_QUERY_ELEMENT& qel, const pmapi::intro::Root& intro) override
-            {
-                if (qel.metric == PM_METRIC_GAMING_QOS_SCORE) {
-                    if (qel.stat != PM_STAT_AVG) {
-                        throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
-                            "Gaming QoS score metric requires PM_STAT_AVG");
-                    }
-
-                    const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_DOUBLE);
-                    qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
-                    qel.dataSize = dataSize;
-                    scoreOffset_ = qel.dataOffset;
-                }
-                else if (qel.metric == PM_METRIC_GAMING_QOS_GRADE) {
-                    if (qel.stat != PM_STAT_NONE) {
-                        throw util::Except<ipc::PmStatusError>(PM_STATUS_QUERY_MALFORMED,
-                            "Gaming QoS grade metric requires PM_STAT_NONE");
-                    }
-
-                    const auto dataSize = ipc::intro::GetDataTypeSizeChecked(PM_DATA_TYPE_STRING);
-                    qel.dataOffset = (uint64_t)util::PadToAlignment((size_t)qel.dataOffset, dataSize);
-                    qel.dataSize = dataSize;
-                    gradeOffset_ = qel.dataOffset;
-                }
-                else {
-                    pmlog_error("Gaming QoS binding received unexpected metric").pmwatch((int)qel.metric);
-                    assert(false);
-                    return;
-                }
-
-                if (!internalRegistered_) {
-                    RegisterInternalStats_(intro);
-                    internalRegistered_ = true;
-                }
-            }
-
-            void Finalize() override
-            {
-                frameBinding_.Finalize();
-            }
-
-            void Poll(const DynamicQueryWindow& window, uint8_t* pBlobBase, ipc::MiddlewareComms& comms,
-                const SwapChainState* pSwapChain, uint32_t processId) const override
-            {
-                (void)comms;
-                (void)processId;
-
-                std::fill(internalBlob_.begin(), internalBlob_.end(), 0);
-                frameBinding_.Poll(window, internalBlob_.data(), comms, pSwapChain, processId);
-
-                util::metrics::GamingQoSInputs inputs{
-                    .avgFps = ReadInternal_(PM_METRIC_PRESENTED_FPS, PM_STAT_AVG, true),
-                    .low1Fps = ReadInternal_(PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_01, true),
-                    .low5Fps = ReadInternal_(PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_05, true),
-                    .pcLatencyMs = ReadInternal_(PM_METRIC_PC_LATENCY, PM_STAT_AVG, false),
-                    .aeP95Ms = ReadInternal_(PM_METRIC_ANIMATION_ERROR, PM_STAT_PERCENTILE_95, false),
-                };
-
-                const auto result = util::metrics::ComputeGamingQoS(inputs);
-                if (scoreOffset_.has_value()) {
-                    auto* pScore = reinterpret_cast<double*>(pBlobBase + *scoreOffset_);
-                    if (result.scoreValid) {
-                        *pScore = result.score;
-                    }
-                    else {
-                        *pScore = std::numeric_limits<double>::quiet_NaN();
-                    }
-                }
-                if (gradeOffset_.has_value()) {
-                    auto* pGrade = reinterpret_cast<char*>(pBlobBase + *gradeOffset_);
-                    std::fill_n(pGrade, PM_MAX_PATH, '\0');
-                    if (result.scoreValid) {
-                        const auto grade = util::metrics::GamingQoSGradeFromScore(result.score, false);
-                        strncpy_s(pGrade, PM_MAX_PATH, grade.c_str(), _TRUNCATE);
-                    }
-                    else {
-                        strncpy_s(pGrade, PM_MAX_PATH, "NA", _TRUNCATE);
-                    }
-                }
-            }
-
-        private:
-            struct InternalStatKey_
-            {
-                PM_METRIC metric;
-                PM_STAT stat;
-            };
-
-            void RegisterInternalStats_(const pmapi::intro::Root& intro)
-            {
-                static constexpr InternalStatKey_ kStats[] = {
-                    { PM_METRIC_PRESENTED_FPS, PM_STAT_AVG },
-                    { PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_01 },
-                    { PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_05 },
-                    { PM_METRIC_PC_LATENCY, PM_STAT_AVG },
-                    { PM_METRIC_ANIMATION_ERROR, PM_STAT_PERCENTILE_95 },
-                };
-
-                size_t cursor = 0;
-                for (const auto& key : kStats) {
-                    PM_QUERY_ELEMENT internalQel{
-                        .metric = key.metric,
-                        .stat = key.stat,
-                        .deviceId = 0,
-                        .arrayIndex = 0,
-                    };
-                    internalQel.dataOffset = cursor;
-                    frameBinding_.AddMetricStat(internalQel, intro);
-                    internalStats_.push_back(internalQel);
-                    cursor = (size_t)internalQel.dataOffset + (size_t)internalQel.dataSize;
-                }
-            }
-
-            std::optional<double> ReadInternal_(PM_METRIC metric, PM_STAT stat, bool requirePositive) const
-            {
-                for (const auto& internalQel : internalStats_) {
-                    if (internalQel.metric == metric && internalQel.stat == stat) {
-                        const auto* pValue = reinterpret_cast<const double*>(internalBlob_.data() + internalQel.dataOffset);
-                        const double value = *pValue;
-                        if (!std::isfinite(value)) {
-                            return std::nullopt;
-                        }
-                        if (metric == PM_METRIC_PC_LATENCY && util::metrics::IsMissingFrameMetricValue(value)) {
-                            return std::nullopt;
-                        }
-                        if (requirePositive && value <= 0.) {
-                            return std::nullopt;
-                        }
-                        return value;
-                    }
-                }
-                return std::nullopt;
-            }
-
-            FrameMetricBinding_ frameBinding_{ PM_QUERY_ELEMENT{} };
-            mutable std::array<uint8_t, 256> internalBlob_{};
-            std::vector<PM_QUERY_ELEMENT> internalStats_;
-            std::optional<uint64_t> scoreOffset_;
-            std::optional<uint64_t> gradeOffset_;
-            bool internalRegistered_ = false;
-        };
-
         class StaticMetricBinding_ : public MetricBinding
         {
         public:
@@ -506,11 +351,6 @@ namespace pmon::mid
     std::unique_ptr<MetricBinding> MakeFrameMetricBinding(PM_QUERY_ELEMENT& qel)
     {
         return std::make_unique<FrameMetricBinding_>(qel);
-    }
-
-    std::unique_ptr<MetricBinding> MakeGamingQoSMetricBinding(PM_QUERY_ELEMENT& qel)
-    {
-        return std::make_unique<GamingQoSMetricBinding_>(qel);
     }
 
     std::unique_ptr<MetricBinding> MakeTelemetryMetricBinding(PM_QUERY_ELEMENT& qel, const pmapi::intro::Root& intro)

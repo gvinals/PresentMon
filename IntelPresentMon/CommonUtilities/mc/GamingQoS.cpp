@@ -89,13 +89,10 @@ namespace pmon::util::metrics
         return result;
     }
 
-    std::string GamingQoSGradeFromScore(double score, bool enableSPlus)
+    std::string GamingQoSGradeFromScore(double score)
     {
         if (!std::isfinite(score)) {
             return "NA";
-        }
-        if (enableSPlus && score >= 99.) {
-            return "S+";
         }
         if (score >= 96.) {
             return "S";
@@ -115,9 +112,9 @@ namespace pmon::util::metrics
         return "F";
     }
 
-    std::wstring GamingQoSGradeFromScoreW(double score, bool enableSPlus)
+    std::wstring GamingQoSGradeFromScoreW(double score)
     {
-        const auto grade = GamingQoSGradeFromScore(score, enableSPlus);
+        const auto grade = GamingQoSGradeFromScore(score);
         return std::wstring(grade.begin(), grade.end());
     }
 }

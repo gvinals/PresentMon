@@ -8,6 +8,7 @@
 #include "../Core/source/gfx/base/Geometry.h"
 #include "kact/PushSpecification.h"
 #include "../CommonUtilities/str/String.h"
+#include <algorithm>
 
 namespace kproc
 {
@@ -251,6 +252,28 @@ namespace kproc
                 // sheets.push_back(Stylesheet::Make({ {"$readout"}, {"$text-value"} }));
             }
 
+            // QoS readouts
+            {
+                const auto margin = 0.;
+                const auto padding = 2.;
+
+                sheets.push_back(Stylesheet::Make({ {}, { "$qos-readout" } }));
+                sheets.back()->InsertRaw<at::marginLeft>(margin);
+                sheets.back()->InsertRaw<at::marginTop>(margin);
+                sheets.back()->InsertRaw<at::marginRight>(margin);
+                sheets.back()->InsertRaw<at::marginBottom>(margin);
+                sheets.back()->InsertRaw<at::paddingLeft>(padding);
+                sheets.back()->InsertRaw<at::paddingTop>(padding);
+                sheets.back()->InsertRaw<at::paddingRight>(padding);
+                sheets.back()->InsertRaw<at::paddingBottom>(padding);
+
+                sheets.push_back(Stylesheet::Make({ { "$qos-readout" }, { "$label" } }));
+                sheets.back()->InsertRaw<at::paddingRight>(20.);
+
+                sheets.push_back(Stylesheet::Make({ { "$qos-readout" }, { "$grade-value" } }));
+                sheets.back()->InsertRaw<at::textJustification>(at::make::Enum(prim::Justification::Center));
+            }
+
             pSpec->sheets = std::move(sheets);
         }
 
@@ -445,13 +468,6 @@ namespace kproc
                             .deviceId = 0,
                             .unitId = PM_UNIT_PERCENT,
                         },
-                        .gradeMetric = {
-                            .metricId = PM_METRIC_GAMING_QOS_GRADE,
-                            .statId = PM_STAT_NONE,
-                            .arrayIndex = 0,
-                            .deviceId = 0,
-                            .unitId = PM_UNIT_DIMENSIONLESS,
-                        },
                         .label = L"Gaming QoS",
                         .tag = tag,
                     });
@@ -467,6 +483,10 @@ namespace kproc
                         sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$label" } }));
                         sheets.back()->InsertRaw<at::display>(at::make::Enum(Display::None));
                     }
+                    else {
+                        sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$label" } }));
+                        sheets.back()->InsertRaw<at::paddingRight>(std::max(20., fontSize * 0.85));
+                    }
 
                     sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$text-large" } }));
                     sheets.back()->InsertRaw<at::textColor>(fontColor);
@@ -475,11 +495,10 @@ namespace kproc
                     sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$grade-value" } }));
                     sheets.back()->InsertRaw<at::textColor>(fontColor);
                     sheets.back()->InsertRaw<at::textSize>(fontSize * 1.4);
-
-                    sheets.push_back(Stylesheet::Make({ { "$qos-readout", tag }, { "$score-value" } }));
-                    sheets.back()->InsertRaw<at::textColor>(fontColor);
-                    sheets.back()->InsertRaw<at::textSize>(fontSize);
-                    sheets.back()->InsertRaw<at::paddingLeft>(fontSize / 4.);
+                    sheets.back()->InsertRaw<at::width>(fontSize * 1.8);
+                    sheets.back()->InsertRaw<at::paddingLeft>(fontSize / 3.);
+                    sheets.back()->InsertRaw<at::paddingRight>(fontSize / 3.);
+                    sheets.back()->InsertRaw<at::textJustification>(at::make::Enum(prim::Justification::Center));
                 }
                 else {
                     pmlog_warn(std::format("Unknown widget type; variant index [{}]", widget.index()));

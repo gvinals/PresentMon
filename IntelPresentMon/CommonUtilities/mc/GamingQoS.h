@@ -28,6 +28,6 @@ namespace pmon::util::metrics
 
     GamingQoSResult ComputeGamingQoS(const GamingQoSInputs& inputs);
 
-    std::string GamingQoSGradeFromScore(double score, bool enableSPlus = true);
-    std::wstring GamingQoSGradeFromScoreW(double score, bool enableSPlus = true);
+    std::string GamingQoSGradeFromScore(double score);
+    std::wstring GamingQoSGradeFromScoreW(double score);
 }

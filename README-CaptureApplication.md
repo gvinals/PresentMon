@@ -124,13 +124,12 @@ In Debug configuration, the application will halt with a modal error dialog when
 |Presented Frame Time||The time between this Present call and the previous one, in milliseconds|D|
 |Between App Start|MsBetweenAppStart|How long it took from the start of this frame until the CPU started working on the next frame, in milliseconds.|F|
 |Gaming QoS Score|GamingQoS|Composite gaming quality score from 0-100 based on presented FPS lows, PC latency, and animation error|D|
-|Gaming QoS Grade|GamingQoSGrade|Letter grade (S through F) derived from the Gaming QoS score|D|
 
 *Query Type Codes: **D** = Dynamic Query, **F** = Frame Event Query, **S** = Static Query
 
 ## Gaming QoS
 
-Gaming QoS summarizes frame experience as a **score from 0-100** and a **letter grade** (S+, S, A, B, C, D, F). It is shown on the optional **Gaming QoS** overlay widget using two dynamic query metrics: `PM_METRIC_GAMING_QOS_SCORE` (`PM_STAT_AVG`, double) and `PM_METRIC_GAMING_QOS_GRADE` (`PM_STAT_NONE`, string). Dynamic query registration requires API 3.6+ so clients receive an authoritative poll blob size from `pmRegisterDynamicQuery`. Stats CSV output when **Generate Stats** is enabled uses the score metric.
+Gaming QoS summarizes frame experience as a **score from 0-100** and a **letter grade** (S, A, B, C, D, F). The overlay **Gaming QoS** widget polls `PM_METRIC_GAMING_QOS_SCORE` (`PM_STAT_AVG`, double); the letter grade is derived from that score in the overlay. Dynamic query registration requires API 3.6+ so clients receive an authoritative poll blob size from `pmRegisterDynamicQuery` (the middleware appends hidden frame stat fields used to compute the score). Stats CSV output when **Generate Stats** is enabled includes score and grade columns.
 
 The score uses four equally weighted pillars (missing pillars are omitted and weights are renormalized):
 
@@ -139,7 +138,7 @@ The score uses four equally weighted pillars (missing pillars are omitted and we
 - **PC latency** (linear from 20 ms = best to 60 ms = worst; uses average `MsPCLatency` over the window)
 - **Animation error** (linear from 0.5 ms p95 = best to 2.0 ms p95 = worst; uses absolute animation error)
 
-Grades: S+ at 99+, S at 96-100, A at 90-95, B at 80-89, C at 70-79, D at 60-69, F below 60.
+Grades: S at 96-100, A at 90-95, B at 80-89, C at 70-79, D at 60-69, F below 60.
 
 ## Comma-separated value (CSV) file output
 

@@ -394,7 +394,7 @@ namespace pmon::mid
         std::vector<QueryMetricKey> keys;
         keys.reserve(queryElements.size());
         for (const auto& element : queryElements) {
-            if (element.metric == PM_METRIC_GAMING_QOS_SCORE || element.metric == PM_METRIC_GAMING_QOS_GRADE) {
+            if (element.metric == PM_METRIC_GAMING_QOS_SCORE) {
                 continue;
             }
             keys.push_back(QueryMetricKey{

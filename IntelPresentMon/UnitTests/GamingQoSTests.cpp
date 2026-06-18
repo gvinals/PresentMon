@@ -27,7 +27,7 @@ namespace UtilityTests
             const auto result = ComputeGamingQoS(inputs);
             Assert::IsTrue(result.scoreValid);
             Assert::IsTrue(result.score >= 99.9);
-            Assert::AreEqual(std::string("S+"), GamingQoSGradeFromScore(result.score));
+            Assert::AreEqual(std::string("S"), GamingQoSGradeFromScore(result.score));
         }
 
         TEST_METHOD(LatencyAtBad_ZeroLatencySubscore)
@@ -82,12 +82,13 @@ namespace UtilityTests
 
         TEST_METHOD(GradeBoundaries)
         {
-            Assert::AreEqual(std::string("S"), GamingQoSGradeFromScore(96., false));
-            Assert::AreEqual(std::string("A"), GamingQoSGradeFromScore(90., false));
-            Assert::AreEqual(std::string("B"), GamingQoSGradeFromScore(80., false));
-            Assert::AreEqual(std::string("C"), GamingQoSGradeFromScore(70., false));
-            Assert::AreEqual(std::string("D"), GamingQoSGradeFromScore(60., false));
-            Assert::AreEqual(std::string("F"), GamingQoSGradeFromScore(59.9, false));
+            Assert::AreEqual(std::string("S"), GamingQoSGradeFromScore(99.));
+            Assert::AreEqual(std::string("S"), GamingQoSGradeFromScore(96.));
+            Assert::AreEqual(std::string("A"), GamingQoSGradeFromScore(90.));
+            Assert::AreEqual(std::string("B"), GamingQoSGradeFromScore(80.));
+            Assert::AreEqual(std::string("C"), GamingQoSGradeFromScore(70.));
+            Assert::AreEqual(std::string("D"), GamingQoSGradeFromScore(60.));
+            Assert::AreEqual(std::string("F"), GamingQoSGradeFromScore(59.9));
         }
     };
 }
