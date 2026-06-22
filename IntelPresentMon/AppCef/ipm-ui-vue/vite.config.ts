@@ -4,15 +4,14 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import vuetify from 'vite-plugin-vuetify'
-import type { Plugin } from 'rollup'
 import path from 'node:path'
 
 // Rollup plugin to keep only .woff2 fonts by dropping any font assets
 // whose file name ends in .woff, .ttf or .eot
-function keepOnlyWoff2(): Plugin {
+function keepOnlyWoff2() {
   return {
     name: 'keep-only-woff2',
-    generateBundle(_, bundle) {
+    generateBundle(_options: unknown, bundle: Record<string, unknown>) {
       for (const fileName of Object.keys(bundle)) {
         // if it's one of the font extensions and NOT .woff2, delete it
         if (/\.(woff|ttf|eot)$/.test(fileName)) {
