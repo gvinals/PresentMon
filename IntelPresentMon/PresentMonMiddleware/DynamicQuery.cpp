@@ -141,9 +141,32 @@ namespace
 		{ PM_METRIC_PRESENTED_FPS, PM_STAT_AVG, true },
 		{ PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_01, true },
 		{ PM_METRIC_PRESENTED_FPS, PM_STAT_PERCENTILE_05, true },
-		{ PM_METRIC_PC_LATENCY, PM_STAT_AVG, false },
-		{ PM_METRIC_ANIMATION_ERROR, PM_STAT_PERCENTILE_95, false },
 	};
+
+	std::optional<double> MeanAnimationErrorPercentInWindow_(const SwapChainState* pSwapChain,
+		const DynamicQueryWindow& window)
+	{
+		if (pSwapChain == nullptr) {
+			return std::nullopt;
+		}
+		double sum = 0.;
+		size_t count = 0;
+		pSwapChain->ForEachInTimestampRange(window.oldest, window.newest,
+			[&](const util::metrics::FrameMetrics& fm) {
+				if (util::metrics::IsMissingFrameMetricValue(fm.msAnimationError)) {
+					return;
+				}
+				if (fm.msBetweenPresents <= 0.) {
+					return;
+				}
+				sum += util::metrics::AnimationErrorPercentOfFrame(fm.msAnimationError, fm.msBetweenPresents);
+				++count;
+			});
+		if (count == 0) {
+			return std::nullopt;
+		}
+		return sum / (double)count;
+	}
 }
 
 void PM_DYNAMIC_QUERY::EnsureGamingQoSFrameInputs_(MetricBinding* frameBinding,
@@ -185,9 +208,6 @@ void PM_DYNAMIC_QUERY::ApplyGamingQoS_(uint8_t* pBlobBase) const
 		if (!std::isfinite(value)) {
 			return std::nullopt;
 		}
-		if (slot.metric == PM_METRIC_PC_LATENCY && util::metrics::IsMissingFrameMetricValue(value)) {
-			return std::nullopt;
-		}
 		if (slot.requirePositive && value <= 0.) {
 			return std::nullopt;
 		}
@@ -198,8 +218,7 @@ void PM_DYNAMIC_QUERY::ApplyGamingQoS_(uint8_t* pBlobBase) const
 		.avgFps = readInput(gamingQoS_.inputSlots[0]),
 		.low1Fps = readInput(gamingQoS_.inputSlots[1]),
 		.low5Fps = readInput(gamingQoS_.inputSlots[2]),
-		.pcLatencyMs = readInput(gamingQoS_.inputSlots[3]),
-		.aeP95Ms = readInput(gamingQoS_.inputSlots[4]),
+		.animationErrorPercentAvg = gamingQoS_.animationErrorPercentAvg,
 	};
 
 	const auto result = util::metrics::ComputeGamingQoS(inputs);
@@ -581,6 +600,12 @@ uint32_t PM_DYNAMIC_QUERY::Poll(uint8_t* pBlobBase, ipc::MiddlewareComms& comms,
 		}
 		for (auto& pRing : ringMetricPtrs_) {
 			pRing->Poll(window, pBlob, comms, pSwapChain, processId);
+		}
+		if (gamingQoS_.enabled) {
+			gamingQoS_.animationErrorPercentAvg = MeanAnimationErrorPercentInWindow_(pSwapChain, window);
+		}
+		else {
+			gamingQoS_.animationErrorPercentAvg.reset();
 		}
 		ApplyGamingQoS_(pBlob);
 		if (hasFrameSamples) {

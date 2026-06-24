@@ -123,13 +123,13 @@ In Debug configuration, the application will halt with a modal error dialog when
 |Displayed Frame Time||The time between when the previous frame was displayed and this frame was, in milliseconds|D|
 |Presented Frame Time||The time between this Present call and the previous one, in milliseconds|D|
 |Between App Start|MsBetweenAppStart|How long it took from the start of this frame until the CPU started working on the next frame, in milliseconds.|F|
-|Gaming QoS Score|GamingQoS|Composite gaming quality score from 0-100 based on presented FPS lows, PC latency, and animation error|D|
+|Gaming QoS Score|GamingQoS|Composite gaming quality score from 0-100 based on presented FPS lows and average animation error as percent of frame time|D|
 
 *Query Type Codes: **D** = Dynamic Query, **F** = Frame Event Query, **S** = Static Query
 
 ## Gaming QoS
 
-Gaming QoS summarizes frame experience as a **score from 0-100** and a **letter grade** (S, A, B, C, D, F). The overlay **Gaming QoS** widget polls `PM_METRIC_GAMING_QOS_SCORE` (`PM_STAT_AVG`, double); the letter grade is derived from that score in the overlay. Dynamic query registration requires API 3.6+ so clients receive an authoritative poll blob size from `pmRegisterDynamicQuery` (the middleware appends hidden frame stat fields used to compute the score). Stats CSV output when **Generate Stats** is enabled includes score and grade columns.
+Gaming QoS summarizes frame experience as a **score from 0-100** and a **letter grade** (S, A, B, C, D, F). The score combines presented FPS stability (1% and 5% lows vs average) with **average animation error as a percent of frame time** (0% is best; 50% or higher is worst). PC latency is not part of the score. The overlay **Gaming QoS** widget polls `PM_METRIC_GAMING_QOS_SCORE` (`PM_STAT_AVG`, double); the letter grade is derived from that score in the overlay. Dynamic query registration requires API 3.6+ so clients receive an authoritative poll blob size from `pmRegisterDynamicQuery` (the middleware appends hidden frame stat fields used to compute the score). Stats CSV output when **Generate Stats** is enabled includes score and grade columns.
 
 The score uses four equally weighted pillars (missing pillars are omitted and weights are renormalized):
 

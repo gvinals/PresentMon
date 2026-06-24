@@ -10,10 +10,7 @@ namespace pmon::util::metrics
 {
     namespace
     {
-        constexpr double kLatencyBadMs = 60.;
-        constexpr double kLatencyGoodMs = 20.;
-        constexpr double kAeBadMs = 2.;
-        constexpr double kAeGoodMs = 0.5;
+        constexpr double kAePercentWorst = 50.;
         constexpr double kPillarWeight = 0.25;
 
         double Clamp01(double value)
@@ -29,30 +26,6 @@ namespace pmon::util::metrics
             return Clamp01(*lowFps / *avgFps);
         }
 
-        std::optional<double> LatencySubscore(std::optional<double> pcLatencyMs)
-        {
-            if (!pcLatencyMs.has_value()) {
-                return std::nullopt;
-            }
-            const double span = kLatencyBadMs - kLatencyGoodMs;
-            if (span <= 0.) {
-                return std::nullopt;
-            }
-            return Clamp01((kLatencyBadMs - *pcLatencyMs) / span);
-        }
-
-        std::optional<double> AnimationErrorSubscore(std::optional<double> aeP95Ms)
-        {
-            if (!aeP95Ms.has_value()) {
-                return std::nullopt;
-            }
-            const double span = kAeBadMs - kAeGoodMs;
-            if (span <= 0.) {
-                return std::nullopt;
-            }
-            return Clamp01((kAeBadMs - *aeP95Ms) / span);
-        }
-
         void AccumulatePillar_(double weight, std::optional<double> subscore, double& weightedSum, double& totalWeight)
         {
             if (!subscore.has_value()) {
@@ -63,19 +36,36 @@ namespace pmon::util::metrics
         }
     }
 
+    double AnimationErrorPercentOfFrame(double aeMs, double frameTimeMs)
+    {
+        if (frameTimeMs <= 0.) {
+            return 0.;
+        }
+        return 100. * std::abs(aeMs) / frameTimeMs;
+    }
+
+    std::optional<double> AnimationErrorPercentSubscore(std::optional<double> aePercentAvg)
+    {
+        if (!aePercentAvg.has_value()) {
+            return std::nullopt;
+        }
+        if (kAePercentWorst <= 0.) {
+            return std::nullopt;
+        }
+        return Clamp01((kAePercentWorst - *aePercentAvg) / kAePercentWorst);
+    }
+
     GamingQoSResult ComputeGamingQoS(const GamingQoSInputs& inputs)
     {
         GamingQoSResult result{};
         result.low1Subscore = FpsRatioSubscore(inputs.low1Fps, inputs.avgFps);
         result.low5Subscore = FpsRatioSubscore(inputs.low5Fps, inputs.avgFps);
-        result.latencySubscore = LatencySubscore(inputs.pcLatencyMs);
-        result.animationErrorSubscore = AnimationErrorSubscore(inputs.aeP95Ms);
+        result.animationErrorSubscore = AnimationErrorPercentSubscore(inputs.animationErrorPercentAvg);
 
         double weightedSum = 0.;
         double totalWeight = 0.;
         AccumulatePillar_(kPillarWeight, result.low1Subscore, weightedSum, totalWeight);
         AccumulatePillar_(kPillarWeight, result.low5Subscore, weightedSum, totalWeight);
-        AccumulatePillar_(kPillarWeight, result.latencySubscore, weightedSum, totalWeight);
         AccumulatePillar_(kPillarWeight, result.animationErrorSubscore, weightedSum, totalWeight);
 
         if (totalWeight <= 0.) {

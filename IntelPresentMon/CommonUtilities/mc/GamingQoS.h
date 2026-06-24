@@ -12,8 +12,7 @@ namespace pmon::util::metrics
         std::optional<double> avgFps;
         std::optional<double> low1Fps;
         std::optional<double> low5Fps;
-        std::optional<double> pcLatencyMs;
-        std::optional<double> aeP95Ms;
+        std::optional<double> animationErrorPercentAvg;
     };
 
     struct GamingQoSResult
@@ -22,9 +21,11 @@ namespace pmon::util::metrics
         bool scoreValid = false;
         std::optional<double> low1Subscore;
         std::optional<double> low5Subscore;
-        std::optional<double> latencySubscore;
         std::optional<double> animationErrorSubscore;
     };
+
+    double AnimationErrorPercentOfFrame(double aeMs, double frameTimeMs);
+    std::optional<double> AnimationErrorPercentSubscore(std::optional<double> aePercentAvg);
 
     GamingQoSResult ComputeGamingQoS(const GamingQoSInputs& inputs);
 

@@ -521,6 +521,7 @@ namespace p2c::pmon
         frameStatsPath{ std::move(frameStatsPathIn) },
         pStatsTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
         pAnimationErrorTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
+        pAnimationErrorPercentTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
         pPcLatencyTracker{ frameStatsPath ? std::make_unique<StatisticsTracker>() : nullptr },
         file{ path }
     {
@@ -568,6 +569,16 @@ namespace p2c::pmon
                         pAnimationErrorTracker->Push(std::abs(animationError));
                     }
                 }
+                if (pAnimationErrorPercentTracker && pStatsTracker) {
+                    const auto animationError = pQueryElementContainer->ExtractAnimationErrorFromBlob(pBlob);
+                    const auto frameTime = pQueryElementContainer->ExtractFrameTimeFromBlob(pBlob);
+                    if (!std::isnan(animationError) &&
+                        !::pmon::util::metrics::IsMissingFrameMetricValue(animationError) &&
+                        frameTime > 0.) {
+                        pAnimationErrorPercentTracker->Push(
+                            ::pmon::util::metrics::AnimationErrorPercentOfFrame(animationError, frameTime));
+                    }
+                }
                 if (pPcLatencyTracker) {
                     const auto pcLatency = pQueryElementContainer->ExtractPcLatencyFromBlob(pBlob);
                     if (!std::isnan(pcLatency) &&
@@ -590,7 +601,7 @@ namespace p2c::pmon
     {
         auto& stats = *pStatsTracker;
         auto& aeStats = *pAnimationErrorTracker;
-        auto& pcStats = *pPcLatencyTracker;
+        auto& aePercentStats = *pAnimationErrorPercentTracker;
 
         std::ofstream statsFile{ *frameStatsPath, std::ios::trunc };
 
@@ -609,7 +620,6 @@ namespace p2c::pmon
             "GamingQoSGrade,"
             "GamingQoSLow1Subscore,"
             "GamingQoSLow5Subscore,"
-            "GamingQoSLatencySubscore,"
             "GamingQoSAnimationErrorSubscore\n";
 
         // lambda to make sure we don't divide by zero
@@ -629,11 +639,8 @@ namespace p2c::pmon
             if (low5Fps > 0.) {
                 inputs.low5Fps = low5Fps;
             }
-            if (pcStats.GetCount() > 0) {
-                inputs.pcLatencyMs = pcStats.GetMean() * 1000.;
-            }
-            if (aeStats.GetCount() > 0) {
-                inputs.aeP95Ms = aeStats.GetPercentile(0.95) * 1000.;
+            if (aePercentStats.GetCount() > 0) {
+                inputs.animationErrorPercentAvg = aePercentStats.GetMean();
             }
 
             const auto qos = ::pmon::util::metrics::ComputeGamingQoS(inputs);
@@ -642,11 +649,10 @@ namespace p2c::pmon
                     ::pmon::util::metrics::GamingQoSGradeFromScore(qos.score) << ",";
                 statsFile << (qos.low1Subscore ? *qos.low1Subscore : 0.) << ",";
                 statsFile << (qos.low5Subscore ? *qos.low5Subscore : 0.) << ",";
-                statsFile << (qos.latencySubscore ? *qos.latencySubscore : 0.) << ",";
                 statsFile << (qos.animationErrorSubscore ? *qos.animationErrorSubscore : 0.) << "\n";
             }
             else {
-                statsFile << "0,NA,0,0,0,0\n";
+                statsFile << "0,NA,0,0,0\n";
             }
         };
 
@@ -686,7 +692,7 @@ namespace p2c::pmon
                 0. << "," <<
 				0. << "," <<
 				0. << "," <<
-                "0,NA,0,0,0,0\n";
+                "0,NA,0,0,0\n";
         }
     }
 

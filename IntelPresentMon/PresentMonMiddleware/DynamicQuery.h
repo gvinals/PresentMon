@@ -74,7 +74,8 @@ private:
 	{
 		bool enabled = false;
 		std::optional<uint64_t> scoreOutputOffset;
-		std::array<GamingQoSInputSlot_, 5> inputSlots{};
+		std::array<GamingQoSInputSlot_, 3> inputSlots{};
+		mutable std::optional<double> animationErrorPercentAvg;
 	};
 
 	// functions

@@ -21,8 +21,7 @@ namespace UtilityTests
                 .avgFps = 120.,
                 .low1Fps = 120.,
                 .low5Fps = 120.,
-                .pcLatencyMs = 20.,
-                .aeP95Ms = 0.5,
+                .animationErrorPercentAvg = 0.,
             };
             const auto result = ComputeGamingQoS(inputs);
             Assert::IsTrue(result.scoreValid);
@@ -30,28 +29,32 @@ namespace UtilityTests
             Assert::AreEqual(std::string("S"), GamingQoSGradeFromScore(result.score));
         }
 
-        TEST_METHOD(LatencyAtBad_ZeroLatencySubscore)
+        TEST_METHOD(AnimationErrorPercentSubscore_Boundaries)
         {
-            GamingQoSInputs inputs{
-                .avgFps = 60.,
-                .low1Fps = 60.,
-                .low5Fps = 60.,
-                .pcLatencyMs = 60.,
-                .aeP95Ms = 0.5,
-            };
-            const auto result = ComputeGamingQoS(inputs);
-            Assert::IsTrue(result.latencySubscore.has_value());
-            Assert::AreEqual(0., *result.latencySubscore, 0.0001);
+            const auto at0 = AnimationErrorPercentSubscore(0.);
+            Assert::IsTrue(at0.has_value());
+            Assert::AreEqual(1., *at0, 0.0001);
+
+            const auto at25 = AnimationErrorPercentSubscore(25.);
+            Assert::IsTrue(at25.has_value());
+            Assert::AreEqual(0.5, *at25, 0.0001);
+
+            const auto at50 = AnimationErrorPercentSubscore(50.);
+            Assert::IsTrue(at50.has_value());
+            Assert::AreEqual(0., *at50, 0.0001);
+
+            const auto at100 = AnimationErrorPercentSubscore(100.);
+            Assert::IsTrue(at100.has_value());
+            Assert::AreEqual(0., *at100, 0.0001);
         }
 
-        TEST_METHOD(MissingPcLatency_ReweightsRemainingPillars)
+        TEST_METHOD(MissingAnimationError_ReweightsFpsPillars)
         {
             GamingQoSInputs inputs{
                 .avgFps = 100.,
                 .low1Fps = 100.,
                 .low5Fps = 100.,
-                .pcLatencyMs = std::nullopt,
-                .aeP95Ms = 0.5,
+                .animationErrorPercentAvg = std::nullopt,
             };
             const auto result = ComputeGamingQoS(inputs);
             Assert::IsTrue(result.scoreValid);
@@ -72,12 +75,24 @@ namespace UtilityTests
                 .avgFps = 60.,
                 .low1Fps = 90.,
                 .low5Fps = 60.,
-                .pcLatencyMs = 20.,
-                .aeP95Ms = 0.5,
+                .animationErrorPercentAvg = 0.,
             };
             const auto result = ComputeGamingQoS(inputs);
             Assert::IsTrue(result.low1Subscore.has_value());
             Assert::AreEqual(1., *result.low1Subscore, 0.0001);
+        }
+
+        TEST_METHOD(ModerateAnimationErrorPercent_LowersScore)
+        {
+            GamingQoSInputs inputs{
+                .avgFps = 120.,
+                .low1Fps = 120.,
+                .low5Fps = 120.,
+                .animationErrorPercentAvg = 10.,
+            };
+            const auto result = ComputeGamingQoS(inputs);
+            Assert::IsTrue(result.scoreValid);
+            Assert::IsTrue(result.score >= 96. && result.score < 100.);
         }
 
         TEST_METHOD(GradeBoundaries)
